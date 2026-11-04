@@ -31,6 +31,8 @@ jobs:
         run: python calendar_bot.py
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
+          SHEETS_TOKEN: ${{ secrets.SHEETS_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COUNTRIES: ID,US,CN,EU,JP
           MIN_ALERT: SEDANG
