@@ -51,9 +51,11 @@ DRY_RUN = os.getenv("DRY_RUN") == "1"
 # Default: kalender hanya dipantau, yang dikirim ke Discord cuma hasil rilis.
 SEND_PREVIEW = os.getenv("SEND_PREVIEW", "0") == "1"    # jadwal harian
 SEND_REMINDER = os.getenv("SEND_REMINDER", "0") == "1"  # pengingat sebelum rilis
+TEST_SEND = os.getenv("TEST_SEND", "0") == "1"  # kirim 1 rilis terakhir sebagai tes, lalu berhenti
 SHEETS_URL = os.getenv("SHEETS_WEBHOOK_URL", "")
 SHEETS_TOKEN = os.getenv("SHEETS_TOKEN", "")
-BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "400"))
+BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "1830"))  # ±5 tahun riwayat untuk Google Sheets
+BACKFILL_VERSION = "v3-cadangan"  # ganti nilai ini = paksa isi ulang riwayat Sheets
 SHEETS_BUDGET = int(os.getenv("SHEETS_BUDGET_SECONDS", "150"))  # waktu maksimal cicil riwayat per run  # riwayat awal saat Sheets pertama tersambung
 
 WIB = ZoneInfo("Asia/Jakarta")
@@ -472,11 +474,35 @@ def sheet_name(ev):
     return name[:95]
 
 
+MONTHS_EN = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+
+
+def data_month(ev):
+    """Bulan periode data (bukan tanggal rilis), format YYYY-MM-01."""
+    ref = ev.get("referenceDate")
+    if ref:
+        try:
+            d = parse_dt(ref)
+            return f"{d.year:04d}-{d.month:02d}-01"
+        except ValueError:
+            pass
+    rel = parse_dt(ev["date"]).astimezone(WIB)
+    per = (ev.get("period") or "").strip().lower()
+    month = MONTHS_EN.get(per[:3])
+    if per.startswith("q") and per[1:2].isdigit():
+        month = int(per[1]) * 3                       # Q2 -> Jun
+    if month:
+        year = rel.year - 1 if month > rel.month else rel.year
+        return f"{year:04d}-{month:02d}-01"
+    return f"{rel.year:04d}-{rel.month:02d}-01"     # fallback: bulan rilis
+
+
 def sheet_row(ev):
     _, diff, _ = surprise(ev)
     unit = (ev.get("scale") or "") + (ev.get("unit") or "")
     return {
-        "sheet": sheet_name(ev), "id": ev["id"],
+        "sheet": sheet_name(ev), "id": ev["id"], "month": data_month(ev), "source": "TradingView",
         "date": parse_dt(ev["date"]).astimezone(WIB).isoformat(),
         "period": ev.get("period") or "", "actual": ev.get("actual"),
         "forecast": ev.get("forecast"), "previous": ev.get("previous"),
@@ -507,18 +533,158 @@ def push_sheets(rows):
     return True
 
 
+def fetch_history(now, days):
+    """Ambil riwayat panjang dalam potongan 60 hari (lebih aman untuk endpoint)."""
+    out, seen = [], set()
+    for start in range(days, 0, -60):
+        end_ago = max(start - 60, 0)
+        chunk_now = now - dt.timedelta(days=end_ago)
+        try:
+            for e in fetch_events(chunk_now, back_days=start - end_ago, fwd_days=0):
+                if e["id"] not in seen:
+                    seen.add(e["id"])
+                    out.append(e)
+        except Exception as e:
+            log.warning("Riwayat %d-%d hari lalu gagal: %s", start, end_ago, e)
+        time.sleep(0.4)
+    return sorted(out, key=lambda e: e["date"])
+
+
+# ---------------------------------------------------------------- sumber cadangan
+# Dipakai HANYA untuk mengisi bulan yang tidak ada di TradingView (tanpa API key).
+# (negara, kata wajib di judul, kata terlarang, sumber, kode seri, transformasi, judul sheet bila belum ada)
+FALLBACKS = [
+    ("US", ["fed interest rate decision"], [], "FRED", "DFEDTARU", "last", "Fed Interest Rate Decision"),
+    ("US", ["inflation rate", "yoy"], ["core"], "FRED", "CPIAUCSL", "yoy", "Inflation Rate YoY"),
+    ("US", ["inflation rate", "mom"], ["core"], "FRED", "CPIAUCSL", "mom", "Inflation Rate MoM"),
+    ("US", ["core inflation rate", "yoy"], [], "FRED", "CPILFESL", "yoy", "Core Inflation Rate YoY"),
+    ("US", ["core inflation rate", "mom"], [], "FRED", "CPILFESL", "mom", "Core Inflation Rate MoM"),
+    ("US", ["unemployment rate"], [], "FRED", "UNRATE", "last", "Unemployment Rate"),
+    ("US", ["non farm payrolls"], [], "FRED", "PAYEMS", "diff", "Non Farm Payrolls"),
+    ("US", ["pce price index", "yoy"], ["core"], "FRED", "PCEPI", "yoy", "PCE Price Index YoY"),
+    ("US", ["core pce price index", "yoy"], [], "FRED", "PCEPILFE", "yoy", "Core PCE Price Index YoY"),
+    ("US", ["retail sales", "mom"], ["ex "], "FRED", "RSAFS", "mom", "Retail Sales MoM"),
+    ("US", ["gdp growth rate qoq"], [], "FRED", "A191RL1Q225SBEA", "quarter", "GDP Growth Rate QoQ"),
+    ("ID", ["interest rate decision"], [], "BIS", "ID", "last", "Interest Rate Decision"),
+    ("JP", ["boj interest rate decision"], [], "BIS", "JP", "last", "BoJ Interest Rate Decision"),
+]
+FALLBACK_HEADERS = {"User-Agent": "Mozilla/5.0 (EconOutlookBot/1.0; personal research)"}
+
+
+def _csv_rows(url, params=None):
+    import csv
+    r = requests.get(url, params=params, headers=FALLBACK_HEADERS, timeout=60)
+    r.raise_for_status()
+    return list(csv.reader(r.text.splitlines()))
+
+
+def fetch_fred_monthly(sid):
+    """FRED CSV publik -> {YYYY-MM: nilai terakhir bulan itu}."""
+    rows = _csv_rows("https://fred.stlouisfed.org/graph/fredgraph.csv", {"id": sid})
+    out = {}
+    for row in rows[1:]:
+        try:
+            out[row[0][:7]] = float(row[1])   # data harian: nilai terakhir di bulan itu menang
+        except (ValueError, IndexError):
+            continue
+    return out
+
+
+def fetch_bis_monthly(cc, start):
+    """Suku bunga kebijakan BIS (WS_CBPOL) -> {YYYY-MM: nilai}."""
+    urls = [f"https://stats.bis.org/api/v1/data/WS_CBPOL/M.{cc}/all",
+            f"https://stats.bis.org/api/v2/data/dataflow/BIS/WS_CBPOL/1.0/M.{cc}"]
+    for url in urls:
+        try:
+            rows = _csv_rows(url, {"format": "csv", "startPeriod": start})
+            head = rows[0]
+            ti, vi = head.index("TIME_PERIOD"), head.index("OBS_VALUE")
+            return {r[ti][:7]: float(r[vi]) for r in rows[1:] if len(r) > vi and r[vi]}
+        except Exception as e:
+            log.warning("BIS %s gagal di %s: %s", cc, url, e)
+    return {}
+
+
+def _transform(levels, how):
+    keys = sorted(levels)
+    out = {}
+    for i, k in enumerate(keys):
+        v = levels[k]
+        if how in ("last", "quarter"):
+            out[k] = round(v, 2)
+        elif how == "diff" and i >= 1:
+            out[k] = round(v - levels[keys[i - 1]], 0)
+        elif how == "mom" and i >= 1:
+            out[k] = round((v / levels[keys[i - 1]] - 1) * 100, 1)
+        elif how == "yoy" and i >= 12:
+            out[k] = round((v / levels[keys[i - 12]] - 1) * 100, 1)
+    if how == "quarter":  # FRED kuartal ditulis bulan awal (Apr) -> samakan dgn TradingView (Jun)
+        shifted = {}
+        for k, v in out.items():
+            y, m = int(k[:4]), int(k[5:7]) + 2
+            y, m = (y + 1, m - 12) if m > 12 else (y, m)
+            shifted[f"{y:04d}-{m:02d}"] = v
+        out = shifted
+    return out
+
+
+def add_fallbacks(groups, now, min_rank):
+    """Lengkapi bulan yang kosong di TradingView dari FRED / BIS."""
+    start = (now - dt.timedelta(days=BACKFILL_DAYS)).strftime("%Y-%m")
+    end = now.astimezone(WIB).strftime("%Y-%m")
+    cache = {}
+    for country, need, avoid, src, sid, how, label in FALLBACKS:
+        level = classify({"title": label, "country": country, "importance": 1})[0]
+        if LEVEL_RANK[level] < min_rank:
+            continue
+        target = None
+        for name, rows in groups.items():
+            t = (rows[0].get("title") or "").lower()
+            if (rows[0].get("country") == country and all(w in t for w in need)
+                    and not any(w in t for w in avoid)):
+                target = name
+                break
+        target = target or sheet_name({"country": country, "title": label})
+        rows = groups.setdefault(target, [])
+        have = {r["month"][:7] for r in rows}
+        try:
+            key = (src, sid)
+            if key not in cache:
+                cache[key] = fetch_fred_monthly(sid) if src == "FRED" else fetch_bis_monthly(sid, start)
+            series = _transform(cache[key], how)
+        except Exception as e:
+            log.warning("Cadangan %s %s gagal: %s", src, sid, e)
+            continue
+        added = 0
+        for month, val in series.items():
+            if month < start or month > end or month in have:
+                continue
+            rows.append({
+                "sheet": target, "id": f"{src}:{sid}:{month}", "month": f"{month}-01",
+                "date": f"{month}-01T00:00:00+07:00", "period": "", "actual": val,
+                "forecast": None, "previous": None, "surprise": None,
+                "unit": "K" if how == "diff" else "%", "impact": level, "country": country,
+                "title": rows[0]["title"] if rows and rows[0].get("title") else label,
+                "source": f"{src} ({sid})",
+            })
+            added += 1
+        if added:
+            log.info("Cadangan %s %s: +%d bulan untuk %s", src, sid, added, target)
+
+
 def backfill_sheets(st, now, min_rank, budget_s):
     """Isi riwayat dicicil per sheet sampai batas waktu, lanjut di run berikutnya."""
     t0 = time.time()
-    hist = fetch_events(now, back_days=BACKFILL_DAYS, fwd_days=0)
+    hist = fetch_history(now, BACKFILL_DAYS)
     groups = {}
     for e in hist:
         if (e.get("actual") is not None and parse_dt(e["date"]) <= now
                 and LEVEL_RANK[classify(e)[0]] >= min_rank):
             row = sheet_row(e)
             groups.setdefault(row["sheet"], []).append(row)
+    add_fallbacks(groups, now, min_rank)
     done = set(st.get("backfill_done", []))
-    todo = sorted(g for g in groups if g not in done)
+    todo = sorted(g for g in groups if g not in done and groups[g])
     log.info("Riwayat Google Sheets: %d sheet selesai, %d tersisa", len(done), len(todo))
     for name in todo:
         if time.time() - t0 > budget_s:
@@ -528,17 +694,47 @@ def backfill_sheets(st, now, min_rank, budget_s):
         done.add(name)
         st["backfill_done"] = sorted(done)
         save_state(st)  # simpan progres tiap sheet, aman kalau run terhenti
-    if all(g in done for g in groups):
+    if all(g in done for g in groups if groups[g]):
         st["sheets_backfilled"] = True
         st.pop("backfill_done", None)
         log.info("Riwayat Google Sheets lengkap")
 
 
+# ---------------------------------------------------------------- mode tes
+def test_send(now):
+    """Kirim rilis berdampak SEDANG/TINGGI terakhir (7 hari) ke Discord + Sheets.
+    Catatan bot tidak diubah, jadi aman dijalankan berkali-kali."""
+    min_rank = LEVEL_RANK.get(MIN_ALERT, 1)
+    evs = fetch_events(now, back_days=7, fwd_days=0)
+    done = sorted((e for e in evs if e.get("actual") is not None and parse_dt(e["date"]) <= now
+                   and LEVEL_RANK[classify(e)[0]] >= min_rank), key=lambda e: e["date"])
+    if not done:
+        log.warning("TES: tidak ada rilis berdampak sedang/tinggi dalam 7 hari terakhir")
+        return
+    ev = done[-1]
+    log.info("TES: mengirim %s %s (%s)", ev.get("country"), ev.get("title"), ev.get("date"))
+    embed = release_embed(ev, evs, now)
+    embed["title"] = "🧪 TES · " + embed["title"]
+    png = make_chart(ev, now)
+    if png:
+        embed["image"] = {"url": "attachment://chart.png"}
+    discord([embed], png=png)
+    if SHEETS_URL:
+        push_sheets([sheet_row(ev)])  # aman: baris yang sama tidak akan tercatat dua kali
+
+
 # ---------------------------------------------------------------- main
 def main():
     now = dt.datetime.now(dt.timezone.utc)
+    if TEST_SEND:
+        test_send(now)
+        return
     st = load_state()
     first_run = "posted" not in st
+    if st.get("backfill_version") != BACKFILL_VERSION:  # format Sheets baru -> isi ulang riwayat
+        st["sheets_backfilled"] = False
+        st.pop("backfill_done", None)
+        st["backfill_version"] = BACKFILL_VERSION
     st.setdefault("posted", [])
     st.setdefault("reminded", [])
 
