@@ -1,65 +1,190 @@
 {
-  "updated_at": "2026-11-04 03:09 UTC",
+  "updated_at": "2026-11-04 03:19 UTC",
   "indicators": [
     {
-      "key": "TV:ECONOMICS:IDBOT",
-      "source": "TradingView (ID)",
-      "indicator": "Balance of Trade",
-      "period": "Sep. 2026",
-      "value": "3.36B $",
-      "url": "https://www.bps.go.id/"
-    },
-    {
-      "key": "TV:ECONOMICS:IDFYGDPG",
-      "source": "TradingView (ID)",
-      "indicator": "Full Year GDP Growth",
-      "period": "2025",
-      "value": "5.11%",
-      "url": "https://www.bps.go.id/"
-    },
-    {
-      "key": "TV:ECONOMICS:IDGDPYY",
-      "source": "TradingView (ID)",
-      "indicator": "GDP Growth Rate YoY",
-      "period": "Q2 2026",
-      "value": "5.29%",
-      "url": "https://www.bps.go.id/"
-    },
-    {
-      "key": "TV:ECONOMICS:IDIRYY",
-      "source": "TradingView (ID)",
-      "indicator": "Inflation Rate YoY",
-      "period": "Oct. 2026",
-      "value": "3.23%",
-      "url": "https://www.bps.go.id/"
-    },
-    {
       "key": "TV:ECONOMICS:IDINTR",
-      "source": "TradingView (ID)",
-      "indicator": "Interest Rate Decision",
+      "source": "Indonesia",
+      "group": "Moneter",
+      "indicator": "BI-Rate",
       "period": "Oct. 2026",
       "value": "5.75%",
       "url": "https://www.bi.go.id"
     },
     {
-      "key": "TV:ID|LSEG/Ipsos Primary Consumer Sentiment Index",
-      "source": "TradingView (ID)",
-      "indicator": "LSEG/Ipsos Primary Consumer Sentiment Index",
+      "key": "TV:ECONOMICS:IDDIR",
+      "source": "Indonesia",
+      "group": "Moneter",
+      "indicator": "Suku bunga Deposit Facility",
       "period": "Oct. 2026",
-      "value": "53.37",
-      "url": "https://www.ipsos.com"
+      "value": "5%",
+      "url": "https://www.bi.go.id"
     },
     {
-      "key": "TV:ID|Overall Comprehensive Risk",
-      "source": "TradingView (ID)",
-      "indicator": "Overall Comprehensive Risk",
-      "period": "Q4 2026",
-      "value": "4.73",
+      "key": "TV:ECONOMICS:IDLR",
+      "source": "Indonesia",
+      "group": "Moneter",
+      "indicator": "Suku bunga Lending Facility",
+      "period": "Oct. 2026",
+      "value": "6.5%",
+      "url": "https://www.bi.go.id"
+    },
+    {
+      "key": "TV:ID|M2 Money Supply YoY",
+      "source": "Indonesia",
+      "group": "Moneter",
+      "indicator": "Uang beredar M2 (yoy)",
+      "period": "Sep. 2026",
+      "value": "8.3%",
+      "url": "https://www.tradingview.com/economic-calendar/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDLG",
+      "source": "Indonesia",
+      "group": "Moneter",
+      "indicator": "Pertumbuhan kredit (yoy)",
+      "period": "Sep. 2026",
+      "value": "13.26%",
+      "url": "https://www.bi.go.id"
+    },
+    {
+      "key": "TV:ECONOMICS:IDIRYY",
+      "source": "Indonesia",
+      "group": "Inflasi",
+      "indicator": "Inflasi (yoy)",
+      "period": "Oct. 2026",
+      "value": "3.23%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDIRMM",
+      "source": "Indonesia",
+      "group": "Inflasi",
+      "indicator": "Inflasi (mtm)",
+      "period": "Oct. 2026",
+      "value": "0.22%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDCIR",
+      "source": "Indonesia",
+      "group": "Inflasi",
+      "indicator": "Inflasi inti (yoy)",
+      "period": "Oct. 2026",
+      "value": "2.56%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDGDPYY",
+      "source": "Indonesia",
+      "group": "Pertumbuhan",
+      "indicator": "Pertumbuhan GDP (yoy)",
+      "period": "Q2 2026",
+      "value": "5.29%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDGDPQQ",
+      "source": "Indonesia",
+      "group": "Pertumbuhan",
+      "indicator": "Pertumbuhan GDP (qoq)",
+      "period": "Q2 2026",
+      "value": "3.73%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDFYGDPG",
+      "source": "Indonesia",
+      "group": "Pertumbuhan",
+      "indicator": "Pertumbuhan GDP setahun penuh",
+      "period": "2025",
+      "value": "5.11%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDBOT",
+      "source": "Indonesia",
+      "group": "Eksternal",
+      "indicator": "Neraca perdagangan",
+      "period": "Sep. 2026",
+      "value": "US$3.36B",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDEXPYY",
+      "source": "Indonesia",
+      "group": "Eksternal",
+      "indicator": "Ekspor (yoy)",
+      "period": "Sep. 2026",
+      "value": "11.87%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDIMPYY",
+      "source": "Indonesia",
+      "group": "Eksternal",
+      "indicator": "Impor (yoy)",
+      "period": "Sep. 2026",
+      "value": "18.41%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDFER",
+      "source": "Indonesia",
+      "group": "Eksternal",
+      "indicator": "Cadangan devisa",
+      "period": "Sep. 2026",
+      "value": "US$146.3B",
+      "url": "https://www.bi.go.id"
+    },
+    {
+      "key": "TV:ID|Current Account to GDP",
+      "source": "Indonesia",
+      "group": "Eksternal",
+      "indicator": "Transaksi berjalan (% GDP)",
+      "period": "Q2 2026",
+      "value": "-3.3%",
+      "url": "https://www.bi.go.id"
+    },
+    {
+      "key": "TV:ECONOMICS:IDCCI",
+      "source": "Indonesia",
+      "group": "Konsumsi & aktivitas",
+      "indicator": "Indeks keyakinan konsumen",
+      "period": "Sep. 2026",
+      "value": "118.1",
+      "url": "https://www.bi.go.id"
+    },
+    {
+      "key": "TV:ECONOMICS:IDRSYY",
+      "source": "Indonesia",
+      "group": "Konsumsi & aktivitas",
+      "indicator": "Penjualan ritel (yoy)",
+      "period": "Aug. 2026",
+      "value": "1.3%",
+      "url": "https://www.bi.go.id"
+    },
+    {
+      "key": "TV:ID|Car Sales YoY",
+      "source": "Indonesia",
+      "group": "Konsumsi & aktivitas",
+      "indicator": "Penjualan mobil (yoy)",
+      "period": "Sep. 2026",
+      "value": "28.1%",
+      "url": "https://www.tradingview.com/economic-calendar/"
+    },
+    {
+      "key": "TV:ID|Indonesia-Sales & Orders-Motorbike Sales YY*",
+      "source": "Indonesia",
+      "group": "Konsumsi & aktivitas",
+      "indicator": "Penjualan motor (yoy)",
+      "period": "Sep. 2026",
+      "value": "15.37%",
       "url": "https://www.tradingview.com/economic-calendar/"
     },
     {
       "key": "FRED:DFEDTARU",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Moneter",
       "indicator": "Fed Funds Rate - batas atas target (%)",
       "period": "2026-11-03",
       "value": 4.0,
@@ -67,7 +192,8 @@
     },
     {
       "key": "FRED:FEDFUNDS",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Moneter",
       "indicator": "Fed Funds Rate efektif (%)",
       "period": "2026-10-01",
       "value": 3.88,
@@ -75,7 +201,8 @@
     },
     {
       "key": "FRED:CPIAUCSL",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Inflasi",
       "indicator": "Inflasi CPI AS (% yoy)",
       "period": "2026-09-01",
       "value": 4.02,
@@ -83,7 +210,8 @@
     },
     {
       "key": "FRED:PCEPILFE",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Inflasi",
       "indicator": "Core PCE AS (% yoy)",
       "period": "2026-09-01",
       "value": 3.12,
@@ -91,7 +219,8 @@
     },
     {
       "key": "FRED:UNRATE",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Tenaga kerja",
       "indicator": "Tingkat pengangguran AS (%)",
       "period": "2026-09-01",
       "value": 4.2,
@@ -99,7 +228,8 @@
     },
     {
       "key": "FRED:A191RL1Q225SBEA",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Pertumbuhan",
       "indicator": "Pertumbuhan GDP riil AS (% qoq, annualized)",
       "period": "2026-07-01",
       "value": 3.4,
@@ -107,7 +237,8 @@
     },
     {
       "key": "FRED:DGS10",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Pasar",
       "indicator": "US Treasury 10 tahun (%)",
       "period": "2026-11-02",
       "value": 4.91,
@@ -115,7 +246,8 @@
     },
     {
       "key": "FRED:DTWEXBGS",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Pasar",
       "indicator": "Indeks dolar AS (broad)",
       "period": "2026-10-30",
       "value": 121.67,
@@ -123,7 +255,8 @@
     },
     {
       "key": "FRED:CCUSMA02IDM618N",
-      "source": "The Fed / FRED",
+      "source": "Amerika Serikat (FRED)",
+      "group": "Pasar",
       "indicator": "USD/IDR rata-rata bulanan (OECD via FRED)",
       "period": "2026-09-01",
       "value": 17743.05,
