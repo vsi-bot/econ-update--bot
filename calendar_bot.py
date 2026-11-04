@@ -30,6 +30,12 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+# Warna tema (merah ala sekuritas). Ganti hex di sini kalau punya kode warna resmi brand.
+BRAND_RED = "#C8102E"     # garis Actual, aksen utama
+BRAND_DARK = "#3A3A3A"    # garis Forecast, teks
+BRAND_SOFT = "#F7E1E4"    # area lembut di bawah garis Actual
+BRAND_GRID = "#E6E6E6"
+
 # ---------------------------------------------------------------- konfigurasi
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -47,7 +53,8 @@ SEND_PREVIEW = os.getenv("SEND_PREVIEW", "0") == "1"    # jadwal harian
 SEND_REMINDER = os.getenv("SEND_REMINDER", "0") == "1"  # pengingat sebelum rilis
 SHEETS_URL = os.getenv("SHEETS_WEBHOOK_URL", "")
 SHEETS_TOKEN = os.getenv("SHEETS_TOKEN", "")
-BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "400"))  # riwayat awal saat Sheets pertama tersambung
+BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "400"))
+SHEETS_BUDGET = int(os.getenv("SHEETS_BUDGET_SECONDS", "150"))  # waktu maksimal cicil riwayat per run  # riwayat awal saat Sheets pertama tersambung
 
 WIB = ZoneInfo("Asia/Jakarta")
 TV_URL = "https://economic-calendar.tradingview.com/events"
@@ -304,16 +311,23 @@ def save_state(st):
     STATE_FILE.write_text(json.dumps(st, indent=1), encoding="utf-8")
 
 
-def discord(embeds, content=None):
+def discord(embeds, content=None, png=None):
     for i in range(0, len(embeds), 10):  # max 10 embed per pesan
         body = {"embeds": embeds[i:i + 10], "username": "Macro Calendar Bot"}
         if content and i == 0:
             body["content"] = content
         if DRY_RUN or not WEBHOOK:
             print(json.dumps(body, indent=2, ensure_ascii=False))
+            if png:
+                Path("/tmp/chart_preview.png").write_bytes(png)
             continue
         for _ in range(3):
-            r = requests.post(WEBHOOK, json=body, timeout=30)
+            if png and i == 0:  # kirim gambar grafik sebagai lampiran
+                r = requests.post(WEBHOOK, timeout=60,
+                                  data={"payload_json": json.dumps(body)},
+                                  files={"files[0]": ("chart.png", png, "image/png")})
+            else:
+                r = requests.post(WEBHOOK, json=body, timeout=30)
             if r.status_code == 429:
                 time.sleep(float(r.json().get("retry_after", 2)))
                 continue
@@ -340,6 +354,77 @@ def fetch_events(now, back_days=2, fwd_days=2):
 
 
 # ---------------------------------------------------------------- pesan
+_HISTORY = None
+
+
+def history_events(now):
+    """Riwayat 400 hari semua negara, diambil sekali per run (hanya kalau ada rilis)."""
+    global _HISTORY
+    if _HISTORY is None:
+        try:
+            _HISTORY = fetch_events(now, back_days=400, fwd_days=0)
+        except Exception as e:
+            log.warning("Riwayat untuk grafik gagal diambil: %s", e)
+            _HISTORY = []
+    return _HISTORY
+
+
+def make_chart(ev, now):
+    """Grafik Actual vs Forecast 24 rilis terakhir untuk indikator ini. Return PNG bytes / None."""
+    try:
+        import io as _io
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+    except ImportError:
+        log.warning("matplotlib belum terpasang, grafik dilewati")
+        return None
+
+    k = series_key(ev)
+    pts = {e["id"]: e for e in history_events(now) + [ev]
+           if series_key(e) == k and e.get("actual") is not None}
+    pts = sorted(pts.values(), key=lambda e: e["date"])[-24:]
+    if len(pts) < 3:
+        return None
+    x = [parse_dt(e["date"]).astimezone(WIB) for e in pts]
+    act = [e["actual"] for e in pts]
+    fc = [e.get("forecast") for e in pts]
+    suffix = (ev.get("scale") or "") + ("%" if ev.get("unit") == "%" else "")
+
+    fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
+    fig.patch.set_facecolor("white")
+    ax.fill_between(x, act, min(act + [v for v in fc if v is not None]),
+                    color=BRAND_SOFT, alpha=0.7, zorder=1)
+    ax.plot(x, act, color=BRAND_RED, lw=2.4, marker="o", ms=4, zorder=3, label="Actual")
+    fx = [(a, b) for a, b in zip(x, fc) if b is not None]
+    if fx:
+        ax.plot([a for a, _ in fx], [b for _, b in fx], color=BRAND_DARK, lw=1.6,
+                ls=(0, (4, 3)), zorder=2, label="Forecast/Konsensus")
+    ax.scatter([x[-1]], [act[-1]], s=70, color=BRAND_RED, edgecolor="white", lw=2, zorder=4)
+    ax.annotate(f"{act[-1]:g}{suffix}", (x[-1], act[-1]), xytext=(-10, 10), ha="right",
+                textcoords="offset points", color=BRAND_RED, fontsize=11, fontweight="bold")
+
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.spines["bottom"].set_color("#BDBDBD")
+    ax.grid(axis="y", color=BRAND_GRID, lw=0.8)
+    ax.tick_params(colors="#666666", labelsize=9, length=0)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %y"))
+    if suffix:
+        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}{suffix}"))
+    fig.add_artist(matplotlib.lines.Line2D([0.06, 0.14], [0.955, 0.955], color=BRAND_RED, lw=4))
+    fig.text(0.06, 0.87, ev["title"], fontsize=13, fontweight="bold", color=BRAND_DARK)
+    fig.text(0.06, 0.82, f"{ev.get('country')} · {len(pts)} rilis terakhir · sumber: TradingView",
+             fontsize=8.5, color="#777777")
+    ax.legend(loc="upper left", frameon=False, fontsize=9, labelcolor=BRAND_DARK)
+    fig.subplots_adjust(left=0.09, right=0.96, top=0.76, bottom=0.11)
+    buf = _io.BytesIO()
+    fig.savefig(buf, format="png")
+    plt.close(fig)
+    return buf.getvalue()
+
+
 def release_embed(ev, events, now):
     level, _ = classify(ev)
     emoji, color = LEVEL_STYLE[level]
@@ -401,16 +486,16 @@ def sheet_row(ev):
 
 
 def push_sheets(rows):
-    """Kirim baris ke Apps Script. Return True kalau semua sukses."""
+    """Kirim baris ke Apps Script (per 150 baris). Return True kalau semua sukses."""
     if not rows:
         return True
     if DRY_RUN:
         print(f"[SHEETS] {len(rows)} baris, contoh:", json.dumps(rows[0], ensure_ascii=False))
         return True
-    for i in range(0, len(rows), 200):
+    for i in range(0, len(rows), 150):
         try:
-            r = requests.post(SHEETS_URL, json={"token": SHEETS_TOKEN, "rows": rows[i:i + 200]},
-                              timeout=180)
+            r = requests.post(SHEETS_URL, json={"token": SHEETS_TOKEN, "rows": rows[i:i + 150]},
+                              timeout=150)
             res = r.json()
             if not res.get("ok"):
                 log.warning("Google Sheets menolak: %s", res.get("error"))
@@ -420,6 +505,33 @@ def push_sheets(rows):
             log.warning("Google Sheets gagal: %s", e)
             return False
     return True
+
+
+def backfill_sheets(st, now, min_rank, budget_s):
+    """Isi riwayat dicicil per sheet sampai batas waktu, lanjut di run berikutnya."""
+    t0 = time.time()
+    hist = fetch_events(now, back_days=BACKFILL_DAYS, fwd_days=0)
+    groups = {}
+    for e in hist:
+        if (e.get("actual") is not None and parse_dt(e["date"]) <= now
+                and LEVEL_RANK[classify(e)[0]] >= min_rank):
+            row = sheet_row(e)
+            groups.setdefault(row["sheet"], []).append(row)
+    done = set(st.get("backfill_done", []))
+    todo = sorted(g for g in groups if g not in done)
+    log.info("Riwayat Google Sheets: %d sheet selesai, %d tersisa", len(done), len(todo))
+    for name in todo:
+        if time.time() - t0 > budget_s:
+            break
+        if not push_sheets(groups[name]):
+            break
+        done.add(name)
+        st["backfill_done"] = sorted(done)
+        save_state(st)  # simpan progres tiap sheet, aman kalau run terhenti
+    if all(g in done for g in groups):
+        st["sheets_backfilled"] = True
+        st.pop("backfill_done", None)
+        log.info("Riwayat Google Sheets lengkap")
 
 
 # ---------------------------------------------------------------- main
@@ -478,27 +590,26 @@ def main():
     sheet_rows = []
     for ev in released:
         if LEVEL_RANK[classify(ev)[0]] >= min_rank:
-            discord([release_embed(ev, events, now)])
+            embed = release_embed(ev, events, now)
+            png = make_chart(ev, now)
+            if png:
+                embed["image"] = {"url": "attachment://chart.png"}
+            discord([embed], png=png)
             sheet_rows.append(sheet_row(ev))
         posted.add(ev["id"])
 
-    # 4) Google Sheets: riwayat awal sekali saja, lalu setiap rilis baru
-    if SHEETS_URL or DRY_RUN:
-        if not st.get("sheets_backfilled"):
-            hist = fetch_events(now, back_days=BACKFILL_DAYS, fwd_days=0)
-            sheet_rows = [sheet_row(e) for e in hist
-                          if e.get("actual") is not None and parse_dt(e["date"]) <= now
-                          and LEVEL_RANK[classify(e)[0]] >= min_rank] + sheet_rows
-            log.info("Mengisi riwayat %d hari ke Google Sheets: %d baris", BACKFILL_DAYS, len(sheet_rows))
-        pending = st.get("sheet_pending", []) + sheet_rows  # antrean kalau sebelumnya gagal
-        if push_sheets(pending):
-            st["sheet_pending"] = []
-            st["sheets_backfilled"] = True
-        else:
-            st["sheet_pending"] = pending[-3000:]
-
+    # simpan dulu catatan Discord, supaya aman walau langkah Sheets lama
     st["posted"], st["reminded"] = list(posted), list(reminded)
     save_state(st)
+
+    # 4) Google Sheets: rilis baru dulu (cepat), lalu cicil riwayat awal
+    if SHEETS_URL or DRY_RUN:
+        pending = st.get("sheet_pending", []) + sheet_rows  # antrean kalau sebelumnya gagal
+        st["sheet_pending"] = [] if push_sheets(pending) else pending[-500:]
+        save_state(st)
+        if not st.get("sheets_backfilled"):
+            backfill_sheets(st, now, min_rank, SHEETS_BUDGET)
+        save_state(st)
     log.info("Selesai: %d rilis baru diproses", len(released))
 
 
