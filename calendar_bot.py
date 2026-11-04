@@ -17,6 +17,8 @@ Env vars:
   MIN_ALERT            (opsional) TINGGI / SEDANG / RENDAH, default SEDANG
   PREVIEW_HOUR_WIB     (opsional) default 7
   DRY_RUN=1            (opsional) print ke layar, tidak kirim ke Discord
+  SHEETS_WEBHOOK_URL   (opsional) URL Web app Google Apps Script -> data masuk Google Sheets
+  SHEETS_TOKEN         (opsional) kata sandi yang sama dengan TOKEN di Apps Script
 """
 import datetime as dt
 import json
@@ -43,6 +45,9 @@ DRY_RUN = os.getenv("DRY_RUN") == "1"
 # Default: kalender hanya dipantau, yang dikirim ke Discord cuma hasil rilis.
 SEND_PREVIEW = os.getenv("SEND_PREVIEW", "0") == "1"    # jadwal harian
 SEND_REMINDER = os.getenv("SEND_REMINDER", "0") == "1"  # pengingat sebelum rilis
+SHEETS_URL = os.getenv("SHEETS_WEBHOOK_URL", "")
+SHEETS_TOKEN = os.getenv("SHEETS_TOKEN", "")
+BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "400"))  # riwayat awal saat Sheets pertama tersambung
 
 WIB = ZoneInfo("Asia/Jakarta")
 TV_URL = "https://economic-calendar.tradingview.com/events"
@@ -374,6 +379,49 @@ def preview_embed(evs, title, color):
             "footer": {"text": "🔴 Tinggi · 🟠 Sedang · F = Forecast/Konsensus · P = Previous"}}
 
 
+# ---------------------------------------------------------------- Google Sheets
+def sheet_name(ev):
+    name = f"{ev.get('country')} - {ev.get('title')}"
+    for ch in '[]:*?/\\':
+        name = name.replace(ch, " ")
+    return name[:95]
+
+
+def sheet_row(ev):
+    _, diff, _ = surprise(ev)
+    unit = (ev.get("scale") or "") + (ev.get("unit") or "")
+    return {
+        "sheet": sheet_name(ev), "id": ev["id"],
+        "date": parse_dt(ev["date"]).astimezone(WIB).isoformat(),
+        "period": ev.get("period") or "", "actual": ev.get("actual"),
+        "forecast": ev.get("forecast"), "previous": ev.get("previous"),
+        "surprise": None if diff is None else round(diff, 4), "unit": unit,
+        "impact": classify(ev)[0], "country": ev.get("country"), "title": ev.get("title"),
+    }
+
+
+def push_sheets(rows):
+    """Kirim baris ke Apps Script. Return True kalau semua sukses."""
+    if not rows:
+        return True
+    if DRY_RUN:
+        print(f"[SHEETS] {len(rows)} baris, contoh:", json.dumps(rows[0], ensure_ascii=False))
+        return True
+    for i in range(0, len(rows), 200):
+        try:
+            r = requests.post(SHEETS_URL, json={"token": SHEETS_TOKEN, "rows": rows[i:i + 200]},
+                              timeout=180)
+            res = r.json()
+            if not res.get("ok"):
+                log.warning("Google Sheets menolak: %s", res.get("error"))
+                return False
+            log.info("Google Sheets: +%s baris", res.get("added"))
+        except Exception as e:
+            log.warning("Google Sheets gagal: %s", e)
+            return False
+    return True
+
+
 # ---------------------------------------------------------------- main
 def main():
     now = dt.datetime.now(dt.timezone.utc)
@@ -427,10 +475,27 @@ def main():
     if first_run:  # jangan spam data lama saat pertama kali dinyalakan
         posted.update(e["id"] for e in released)
         released = []
+    sheet_rows = []
     for ev in released:
         if LEVEL_RANK[classify(ev)[0]] >= min_rank:
             discord([release_embed(ev, events, now)])
+            sheet_rows.append(sheet_row(ev))
         posted.add(ev["id"])
+
+    # 4) Google Sheets: riwayat awal sekali saja, lalu setiap rilis baru
+    if SHEETS_URL or DRY_RUN:
+        if not st.get("sheets_backfilled"):
+            hist = fetch_events(now, back_days=BACKFILL_DAYS, fwd_days=0)
+            sheet_rows = [sheet_row(e) for e in hist
+                          if e.get("actual") is not None and parse_dt(e["date"]) <= now
+                          and LEVEL_RANK[classify(e)[0]] >= min_rank] + sheet_rows
+            log.info("Mengisi riwayat %d hari ke Google Sheets: %d baris", BACKFILL_DAYS, len(sheet_rows))
+        pending = st.get("sheet_pending", []) + sheet_rows  # antrean kalau sebelumnya gagal
+        if push_sheets(pending):
+            st["sheet_pending"] = []
+            st["sheets_backfilled"] = True
+        else:
+            st["sheet_pending"] = pending[-3000:]
 
     st["posted"], st["reminded"] = list(posted), list(reminded)
     save_state(st)
