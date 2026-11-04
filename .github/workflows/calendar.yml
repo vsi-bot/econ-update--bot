@@ -19,14 +19,14 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install --quiet requests
+      - run: pip install --quiet requests matplotlib
       - name: Jalankan calendar bot
         run: python calendar_bot.py
         env:
@@ -36,12 +36,12 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COUNTRIES: ID,US,CN,EU,JP
           MIN_ALERT: SEDANG
-          PREVIEW_HOUR_WIB: "7"
       - name: Simpan state
+        if: always()
         run: |
           git config user.name "econ-bot"
           git config user.email "econ-bot@users.noreply.github.com"
-          git add data/calendar_state.json
+          git add data/calendar_state.json || exit 0
           git diff --cached --quiet && exit 0
           git commit -m "calendar: state update"
           git pull --rebase --autostash
