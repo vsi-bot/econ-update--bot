@@ -2,8 +2,12 @@
 """
 Economic Outlook Bot
 --------------------
-Memantau sumber resmi (BI, BPS, The Fed/FRED), menyimpan data terbaru,
-mendeteksi perubahan, dan kirim notifikasi Telegram kalau ada rilis baru.
+Memantau data ekonomi TANPA API key:
+  - Indikator Indonesia (BI-Rate, inflasi, GDP, neraca dagang, dll) dari
+    angka actual terakhir di kalender ekonomi TradingView
+  - Data AS dari unduhan CSV publik FRED (tanpa key)
+  - Press release kebijakan moneter The Fed (RSS)
+Lalu menyimpan data terbaru, mendeteksi perubahan, dan kirim notifikasi.
 
 Output (folder data/):
   latest.json  -> nilai terbaru semua indikator
@@ -11,11 +15,11 @@ Output (folder data/):
   state.json   -> memori bot (nilai & berita yang sudah dilihat)
   OUTLOOK.md   -> ringkasan siap baca (tampil rapi di GitHub)
 
-Env vars:
-  FRED_API_KEY      (gratis: https://fred.stlouisfed.org/docs/api/api_key.html)
-  BPS_API_KEY       (gratis: https://webapi.bps.go.id/developer/)
+Env vars (semua opsional):
+  TV_COUNTRIES      negara dari kalender TradingView, default ID
   TELEGRAM_TOKEN    (opsional, dari @BotFather)
   TELEGRAM_CHAT_ID  (opsional)
+  DISCORD_WEBHOOK_URL (opsional) notifikasi ke Discord
 """
 import csv
 import datetime as dt
@@ -37,10 +41,10 @@ HISTORY_FILE = DATA / "history.csv"
 LATEST_FILE = DATA / "latest.json"
 REPORT_FILE = DATA / "OUTLOOK.md"
 
-FRED_KEY = os.getenv("FRED_API_KEY")
-BPS_KEY = os.getenv("BPS_API_KEY")
+TV_COUNTRIES = os.getenv("TV_COUNTRIES", "ID")
 TG_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TG_CHAT = os.getenv("TELEGRAM_CHAT_ID")
+DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK_URL")
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (EconOutlookBot/1.0; personal research)"}
 TIMEOUT = 30
@@ -57,11 +61,6 @@ FRED_SERIES = [
     ("DTWEXBGS", "Indeks dolar AS (broad)", "lin"),
     ("CCUSMA02IDM618N", "USD/IDR rata-rata bulanan (OECD via FRED)", "lin"),
 ]
-
-BI_PAGES = {
-    "BI-Rate (%)": "https://www.bi.go.id/id/statistik/indikator/bi-rate.aspx",
-    "Inflasi IHK - BI (% yoy)": "https://www.bi.go.id/id/statistik/indikator/data-inflasi.aspx",
-}
 
 FED_FEEDS = [
     "https://www.federalreserve.gov/feeds/press_monetary.xml",
@@ -96,6 +95,13 @@ def get(url, **kw):
 
 def notify(text: str):
     log.info("NOTIF: %s", text.replace("\n", " | "))
+    if DISCORD_WEBHOOK:
+        try:
+            for i in range(0, len(text), 1900):  # batas Discord 2000 karakter
+                requests.post(DISCORD_WEBHOOK, timeout=TIMEOUT, json={
+                    "username": "Economic Outlook Bot", "content": text[i:i + 1900]})
+        except requests.RequestException as e:
+            log.warning("Discord gagal: %s", e)
     if not (TG_TOKEN and TG_CHAT):
         return
     try:
@@ -110,24 +116,23 @@ def notify(text: str):
 
 # ---------------------------------------------------------------- sumber data
 def fetch_fred():
-    """Data AS dari FRED (St. Louis Fed). Return list of indikator."""
-    if not FRED_KEY:
-        log.warning("FRED_API_KEY kosong, FRED dilewati")
-        return []
+    """Data AS dari CSV publik FRED (tanpa API key)."""
     out = []
     for sid, label, units in FRED_SERIES:
         try:
-            j = get(
-                "https://api.stlouisfed.org/fred/series/observations",
-                params={
-                    "series_id": sid, "api_key": FRED_KEY, "file_type": "json",
-                    "sort_order": "desc", "limit": 10, "units": units,
-                },
-            ).json()
-            obs = next(o for o in j["observations"] if o["value"] not in (".", ""))
+            csv_text = get("https://fred.stlouisfed.org/graph/fredgraph.csv",
+                           params={"id": sid}).text
+            df = pd.read_csv(io.StringIO(csv_text))
+            df.columns = ["date", "value"]
+            df["value"] = pd.to_numeric(df["value"], errors="coerce")
+            df = df.dropna()
+            if units == "pc1":  # % perubahan dari 12 bulan sebelumnya (data bulanan)
+                df["value"] = df["value"].pct_change(12) * 100
+                df = df.dropna()
+            last = df.iloc[-1]
             out.append({
                 "key": f"FRED:{sid}", "source": "The Fed / FRED", "indicator": label,
-                "period": obs["date"], "value": round(float(obs["value"]), 2),
+                "period": str(last["date"]), "value": round(float(last["value"]), 2),
                 "url": f"https://fred.stlouisfed.org/series/{sid}",
             })
         except Exception as e:  # satu seri gagal jangan matiin semua
@@ -135,82 +140,44 @@ def fetch_fred():
     return out
 
 
-def fetch_bps():
-    """Indikator strategis BPS (inflasi, pertumbuhan ekonomi, pengangguran, dll)."""
-    if not BPS_KEY:
-        log.warning("BPS_API_KEY kosong, BPS dilewati")
-        return []
-    url = (f"https://webapi.bps.go.id/v1/api/list/model/indicators/"
-           f"lang/ind/domain/0000/key/{BPS_KEY}/")
+def fetch_tradingview():
+    """Angka actual terakhir tiap indikator dari kalender TradingView (tanpa API key)."""
+    now = dt.datetime.now(dt.timezone.utc)
+    params = {
+        "from": (now - dt.timedelta(days=400)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "to": now.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "countries": TV_COUNTRIES,
+    }
     try:
-        j = get(url).json()
+        r = requests.get("https://economic-calendar.tradingview.com/events", params=params,
+                         timeout=TIMEOUT, headers={**HEADERS,
+                                                   "Origin": "https://www.tradingview.com",
+                                                   "Referer": "https://www.tradingview.com/"})
+        r.raise_for_status()
+        j = r.json()
+        events = j.get("result", j) if isinstance(j, dict) else j
     except Exception as e:
-        log.warning("BPS indikator gagal: %s", e)
+        log.warning("TradingView gagal: %s", e)
         return []
-    if j.get("data-availability") != "available":
-        log.warning("BPS: data tidak tersedia (%s)", j.get("status"))
-        return []
-    items = j["data"][1] if len(j.get("data", [])) > 1 else []
+
+    latest = {}  # satu nilai terbaru per indikator
+    for e in events:
+        if e.get("actual") is None or e.get("importance", -1) < 0:
+            continue  # belum rilis / dampak sangat kecil
+        k = e.get("ticker") or f"{e.get('country')}|{e.get('title')}"
+        if k not in latest or e["date"] > latest[k]["date"]:
+            latest[k] = e
+
     out = []
-    for it in items:
-        title = it.get("title") or it.get("name") or "?"
-        period = it.get("periode") or it.get("period") or it.get("data_source") or ""
-        value = it.get("value")
-        unit = it.get("unit") or ""
-        if value in (None, ""):
-            continue
+    for k, e in sorted(latest.items(), key=lambda kv: kv[1].get("title", "")):
+        unit, scale = e.get("unit") or "", e.get("scale") or ""
+        val = f"{e['actual']:g}{scale}" + ("%" if unit == "%" else (f" {unit}" if unit else ""))
         out.append({
-            "key": f"BPS:{it.get('indicator_id', title)}", "source": "BPS",
-            "indicator": f"{title} ({unit})" if unit else title,
-            "period": str(period), "value": value, "url": "https://www.bps.go.id",
+            "key": f"TV:{k}", "source": f"TradingView ({e.get('country')})",
+            "indicator": e.get("title", "?"),
+            "period": e.get("period") or e["date"][:10], "value": val.strip(),
+            "url": e.get("source_url") or "https://www.tradingview.com/economic-calendar/",
         })
-    return out
-
-
-def fetch_bps_news():
-    """Berita Resmi Statistik (BRS) terbaru BPS."""
-    if not BPS_KEY:
-        return []
-    url = (f"https://webapi.bps.go.id/v1/api/list/model/pressrelease/"
-           f"lang/ind/domain/0000/key/{BPS_KEY}/")
-    try:
-        j = get(url).json()
-        items = j["data"][1] if len(j.get("data", [])) > 1 else []
-    except Exception as e:
-        log.warning("BPS BRS gagal: %s", e)
-        return []
-    return [{
-        "id": f"BPS:{it.get('brs_id')}", "source": "BPS",
-        "title": it.get("title", ""), "date": it.get("rl_date", ""),
-        "url": "https://www.bps.go.id/id/pressrelease",
-    } for it in items[:15]]
-
-
-def _pick_col(cols, words):
-    for c in cols:
-        if any(w in str(c).lower() for w in words):
-            return c
-    return None
-
-
-def fetch_bi():
-    """Scrape tabel indikator di bi.go.id (BI belum punya API publik)."""
-    out = []
-    for label, url in BI_PAGES.items():
-        try:
-            tables = pd.read_html(io.StringIO(get(url).text))
-            df = next(t for t in tables if len(t) > 0 and t.shape[1] >= 2)
-            cols = list(df.columns)
-            pcol = _pick_col(cols, ["tanggal", "periode", "bulan", "date"]) or cols[0]
-            vcol = _pick_col(cols, ["rate", "inflasi", "%", "nilai"]) or cols[-1]
-            row = df.iloc[0]
-            out.append({
-                "key": f"BI:{label}", "source": "Bank Indonesia", "indicator": label,
-                "period": str(row[pcol]).strip(), "value": str(row[vcol]).strip(),
-                "url": url,
-            })
-        except Exception as e:
-            log.warning("BI %s gagal (mungkin struktur halaman berubah/diblok): %s", label, e)
     return out
 
 
@@ -243,7 +210,7 @@ def append_history(rows):
 
 def write_report(indicators, news):
     lines = [f"# Economic Outlook Monitor", "", f"_Update terakhir: {now_utc()}_", ""]
-    for src in ["Bank Indonesia", "BPS", "The Fed / FRED"]:
+    for src in sorted({i["source"] for i in indicators}, key=lambda x: x.startswith("The Fed")):
         rows = [i for i in indicators if i["source"] == src]
         if not rows:
             continue
@@ -261,8 +228,8 @@ def main():
     state = load_json(STATE_FILE, {"values": {}, "seen_news": []})
     first_run = not state["values"]
 
-    indicators = fetch_bi() + fetch_bps() + fetch_fred()
-    news = fetch_fed_news() + fetch_bps_news()
+    indicators = fetch_tradingview() + fetch_fred()
+    news = fetch_fed_news()
 
     # --- deteksi perubahan indikator
     changed = []
