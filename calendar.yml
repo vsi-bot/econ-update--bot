@@ -1,0 +1,46 @@
+name: Calendar Bot (TradingView -> Discord)
+
+on:
+  schedule:
+    # Hemat kuota: tiap 15 menit, Senin-Jumat, HANYA di jam rilis data (jam UTC):
+    #   00-07 UTC = 07:00-14:59 WIB -> China, Jepang, BPS, BI (RDG ~14:30 WIB)
+    #   12-15 UTC = 19:00-22:59 WIB -> data AS (CPI, NFP, PCE, GDP, ISM)
+    #   18-19 UTC = 01:00-02:59 WIB -> keputusan FOMC
+    - cron: "*/15 0-7,12-15,18-19 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: repo-write
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install --quiet requests
+      - name: Jalankan calendar bot
+        run: python calendar_bot.py
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          COUNTRIES: ID,US,CN,EU,JP
+          MIN_ALERT: SEDANG
+          PREVIEW_HOUR_WIB: "7"
+      - name: Simpan state
+        run: |
+          git config user.name "econ-bot"
+          git config user.email "econ-bot@users.noreply.github.com"
+          git add data/calendar_state.json
+          git diff --cached --quiet && exit 0
+          git commit -m "calendar: state update"
+          git pull --rebase --autostash
+          git push
