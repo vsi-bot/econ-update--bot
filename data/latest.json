@@ -1,0 +1,240 @@
+{
+  "updated_at": "2026-11-04 03:09 UTC",
+  "indicators": [
+    {
+      "key": "TV:ECONOMICS:IDBOT",
+      "source": "TradingView (ID)",
+      "indicator": "Balance of Trade",
+      "period": "Sep. 2026",
+      "value": "3.36B $",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDFYGDPG",
+      "source": "TradingView (ID)",
+      "indicator": "Full Year GDP Growth",
+      "period": "2025",
+      "value": "5.11%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDGDPYY",
+      "source": "TradingView (ID)",
+      "indicator": "GDP Growth Rate YoY",
+      "period": "Q2 2026",
+      "value": "5.29%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDIRYY",
+      "source": "TradingView (ID)",
+      "indicator": "Inflation Rate YoY",
+      "period": "Oct. 2026",
+      "value": "3.23%",
+      "url": "https://www.bps.go.id/"
+    },
+    {
+      "key": "TV:ECONOMICS:IDINTR",
+      "source": "TradingView (ID)",
+      "indicator": "Interest Rate Decision",
+      "period": "Oct. 2026",
+      "value": "5.75%",
+      "url": "https://www.bi.go.id"
+    },
+    {
+      "key": "TV:ID|LSEG/Ipsos Primary Consumer Sentiment Index",
+      "source": "TradingView (ID)",
+      "indicator": "LSEG/Ipsos Primary Consumer Sentiment Index",
+      "period": "Oct. 2026",
+      "value": "53.37",
+      "url": "https://www.ipsos.com"
+    },
+    {
+      "key": "TV:ID|Overall Comprehensive Risk",
+      "source": "TradingView (ID)",
+      "indicator": "Overall Comprehensive Risk",
+      "period": "Q4 2026",
+      "value": "4.73",
+      "url": "https://www.tradingview.com/economic-calendar/"
+    },
+    {
+      "key": "FRED:DFEDTARU",
+      "source": "The Fed / FRED",
+      "indicator": "Fed Funds Rate - batas atas target (%)",
+      "period": "2026-11-03",
+      "value": 4.0,
+      "url": "https://fred.stlouisfed.org/series/DFEDTARU"
+    },
+    {
+      "key": "FRED:FEDFUNDS",
+      "source": "The Fed / FRED",
+      "indicator": "Fed Funds Rate efektif (%)",
+      "period": "2026-10-01",
+      "value": 3.88,
+      "url": "https://fred.stlouisfed.org/series/FEDFUNDS"
+    },
+    {
+      "key": "FRED:CPIAUCSL",
+      "source": "The Fed / FRED",
+      "indicator": "Inflasi CPI AS (% yoy)",
+      "period": "2026-09-01",
+      "value": 4.02,
+      "url": "https://fred.stlouisfed.org/series/CPIAUCSL"
+    },
+    {
+      "key": "FRED:PCEPILFE",
+      "source": "The Fed / FRED",
+      "indicator": "Core PCE AS (% yoy)",
+      "period": "2026-09-01",
+      "value": 3.12,
+      "url": "https://fred.stlouisfed.org/series/PCEPILFE"
+    },
+    {
+      "key": "FRED:UNRATE",
+      "source": "The Fed / FRED",
+      "indicator": "Tingkat pengangguran AS (%)",
+      "period": "2026-09-01",
+      "value": 4.2,
+      "url": "https://fred.stlouisfed.org/series/UNRATE"
+    },
+    {
+      "key": "FRED:A191RL1Q225SBEA",
+      "source": "The Fed / FRED",
+      "indicator": "Pertumbuhan GDP riil AS (% qoq, annualized)",
+      "period": "2026-07-01",
+      "value": 3.4,
+      "url": "https://fred.stlouisfed.org/series/A191RL1Q225SBEA"
+    },
+    {
+      "key": "FRED:DGS10",
+      "source": "The Fed / FRED",
+      "indicator": "US Treasury 10 tahun (%)",
+      "period": "2026-11-02",
+      "value": 4.91,
+      "url": "https://fred.stlouisfed.org/series/DGS10"
+    },
+    {
+      "key": "FRED:DTWEXBGS",
+      "source": "The Fed / FRED",
+      "indicator": "Indeks dolar AS (broad)",
+      "period": "2026-10-30",
+      "value": 121.67,
+      "url": "https://fred.stlouisfed.org/series/DTWEXBGS"
+    },
+    {
+      "key": "FRED:CCUSMA02IDM618N",
+      "source": "The Fed / FRED",
+      "indicator": "USD/IDR rata-rata bulanan (OECD via FRED)",
+      "period": "2026-09-01",
+      "value": 17743.05,
+      "url": "https://fred.stlouisfed.org/series/CCUSMA02IDM618N"
+    }
+  ],
+  "news": [
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+      "source": "The Fed",
+      "title": "Federal Reserve issues FOMC statement",
+      "date": "Wed, 28 Oct 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Board's discount rate meetings on August 17, September 9, and September 16, 2026",
+      "date": "Tue, 13 Oct 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261007a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Federal Open Market Committee, September 15-16, 2026",
+      "date": "Wed, 7 Oct 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261007a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "source": "The Fed",
+      "title": "Federal Reserve issues FOMC statement",
+      "date": "Wed, 16 Sep 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916b.htm",
+      "source": "The Fed",
+      "title": "Federal Reserve Board and Federal Open Market Committee release economic projections from the September 15-16 FOMC meeting",
+      "date": "Wed, 16 Sep 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916b.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260825a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Board's discount rate meetings on July 20 and July 29, 2026",
+      "date": "Tue, 25 Aug 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260825a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260819a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Federal Open Market Committee, July 28–29, 2026",
+      "date": "Wed, 19 Aug 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260819a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
+      "source": "The Fed",
+      "title": "Federal Reserve issues FOMC statement",
+      "date": "Wed, 29 Jul 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260714a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Board's discount rate meetings on June 8 and June 17, 2026",
+      "date": "Tue, 14 Jul 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260714a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260709a.htm",
+      "source": "The Fed",
+      "title": "Federal Reserve announces the leadership and objectives of its task forces to advance the conduct of monetary policy",
+      "date": "Thu, 9 Jul 2026 19:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260709a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260708a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Federal Open Market Committee, June 16-17, 2026",
+      "date": "Wed, 8 Jul 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260708a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm",
+      "source": "The Fed",
+      "title": "Federal Reserve issues FOMC statement",
+      "date": "Wed, 17 Jun 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm",
+      "source": "The Fed",
+      "title": "Federal Reserve Board and Federal Open Market Committee release economic projections from the June 16-17 FOMC meeting",
+      "date": "Wed, 17 Jun 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260526a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Board's discount rate meeting on April 20 and 29, 2026",
+      "date": "Tue, 26 May 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260526a.htm"
+    },
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Federal Open Market Committee, April 28-29, 2026",
+      "date": "Wed, 20 May 2026 18:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm"
+    }
+  ]
+}
