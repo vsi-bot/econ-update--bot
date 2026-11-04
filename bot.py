@@ -62,6 +62,41 @@ FRED_SERIES = [
     ("CCUSMA02IDM618N", "USD/IDR rata-rata bulanan (OECD via FRED)", "lin"),
 ]
 
+# Indikator Indonesia yang ditampilkan, urut sesuai tampilan.
+# (kelompok, label, kata yang WAJIB ada di judul TradingView, kata yang TIDAK boleh ada)
+ID_INDICATORS = [
+    ("Moneter", "BI-Rate", ["interest rate decision"], []),
+    ("Moneter", "Suku bunga Deposit Facility", ["deposit facility"], []),
+    ("Moneter", "Suku bunga Lending Facility", ["lending facility"], []),
+    ("Moneter", "Uang beredar M2 (yoy)", ["m2"], []),
+    ("Moneter", "Pertumbuhan kredit (yoy)", ["loan growth"], []),
+    ("Inflasi", "Inflasi (yoy)", ["inflation rate", "yoy"], ["core"]),
+    ("Inflasi", "Inflasi (mtm)", ["inflation rate", "mom"], ["core"]),
+    ("Inflasi", "Inflasi inti (yoy)", ["core inflation", "yoy"], []),
+    ("Pertumbuhan", "Pertumbuhan GDP (yoy)", ["gdp growth rate", "yoy"], ["full year"]),
+    ("Pertumbuhan", "Pertumbuhan GDP (qoq)", ["gdp growth rate", "qoq"], []),
+    ("Pertumbuhan", "Pertumbuhan GDP setahun penuh", ["full year gdp"], []),
+    ("Eksternal", "Neraca perdagangan", ["balance of trade"], []),
+    ("Eksternal", "Ekspor (yoy)", ["exports"], []),
+    ("Eksternal", "Impor (yoy)", ["imports"], []),
+    ("Eksternal", "Cadangan devisa", ["foreign exchange reserves"], []),
+    ("Eksternal", "Transaksi berjalan", ["current account"], ["gdp"]),
+    ("Eksternal", "Transaksi berjalan (% GDP)", ["current account", "gdp"], []),
+    ("Konsumsi & aktivitas", "PMI manufaktur", ["manufacturing pmi"], []),
+    ("Konsumsi & aktivitas", "Indeks keyakinan konsumen", ["consumer confidence"], []),
+    ("Konsumsi & aktivitas", "Penjualan ritel (yoy)", ["retail sales", "yoy"], []),
+    ("Konsumsi & aktivitas", "Penjualan mobil (yoy)", ["car sales"], []),
+    ("Konsumsi & aktivitas", "Penjualan motor (yoy)", ["motorbike sales"], []),
+    ("Konsumsi & aktivitas", "Kunjungan wisman (yoy)", ["tourist arrivals"], []),
+    ("Tenaga kerja", "Tingkat pengangguran", ["unemployment rate"], []),
+]
+
+FRED_GROUP = {
+    "DFEDTARU": "Moneter", "FEDFUNDS": "Moneter", "DGS10": "Pasar",
+    "CPIAUCSL": "Inflasi", "PCEPILFE": "Inflasi", "A191RL1Q225SBEA": "Pertumbuhan",
+    "UNRATE": "Tenaga kerja", "DTWEXBGS": "Pasar", "CCUSMA02IDM618N": "Pasar",
+}
+
 FED_FEEDS = [
     "https://www.federalreserve.gov/feeds/press_monetary.xml",
     "https://www.federalreserve.gov/feeds/press_all.xml",
@@ -131,7 +166,8 @@ def fetch_fred():
                 df = df.dropna()
             last = df.iloc[-1]
             out.append({
-                "key": f"FRED:{sid}", "source": "The Fed / FRED", "indicator": label,
+                "key": f"FRED:{sid}", "source": "Amerika Serikat (FRED)",
+                "group": FRED_GROUP.get(sid, "Lainnya"), "indicator": label,
                 "period": str(last["date"]), "value": round(float(last["value"]), 2),
                 "url": f"https://fred.stlouisfed.org/series/{sid}",
             })
@@ -160,22 +196,36 @@ def fetch_tradingview():
         log.warning("TradingView gagal: %s", e)
         return []
 
-    latest = {}  # satu nilai terbaru per indikator
+    def match(title):
+        t = (title or "").lower()
+        for i, (group, label, need, avoid) in enumerate(ID_INDICATORS):
+            if all(w in t for w in need) and not any(w in t for w in avoid):
+                return i, group, label
+        return None
+
+    latest = {}  # satu nilai terbaru per indikator yang ada di daftar
     for e in events:
-        if e.get("actual") is None or e.get("importance", -1) < 0:
-            continue  # belum rilis / dampak sangat kecil
+        m = match(e.get("title"))
+        if e.get("actual") is None or e.get("country") != "ID" or not m:
+            continue
         k = e.get("ticker") or f"{e.get('country')}|{e.get('title')}"
-        if k not in latest or e["date"] > latest[k]["date"]:
-            latest[k] = e
+        if k not in latest or e["date"] > latest[k][0]["date"]:
+            latest[k] = (e, m)
 
     out = []
-    for k, e in sorted(latest.items(), key=lambda kv: kv[1].get("title", "")):
+    for k, (e, (order, group, label)) in sorted(latest.items(), key=lambda kv: kv[1][1][0]):
         unit, scale = e.get("unit") or "", e.get("scale") or ""
-        val = f"{e['actual']:g}{scale}" + ("%" if unit == "%" else (f" {unit}" if unit else ""))
+        sign = "-" if e["actual"] < 0 else ""
+        num = f"{abs(e['actual']):,.2f}".rstrip("0").rstrip(".") + scale
+        if unit == "%":
+            val = sign + num + "%"
+        elif unit in ("$", "€", "¥", "£"):
+            val = sign + ("US$" if unit == "$" else unit) + num
+        else:
+            val = f"{sign}{num} {unit}".strip()
         out.append({
-            "key": f"TV:{k}", "source": f"TradingView ({e.get('country')})",
-            "indicator": e.get("title", "?"),
-            "period": e.get("period") or e["date"][:10], "value": val.strip(),
+            "key": f"TV:{k}", "source": "Indonesia", "group": group, "indicator": label,
+            "period": e.get("period") or e["date"][:10], "value": val,
             "url": e.get("source_url") or "https://www.tradingview.com/economic-calendar/",
         })
     return out
@@ -209,17 +259,23 @@ def append_history(rows):
 
 
 def write_report(indicators, news):
-    lines = [f"# Economic Outlook Monitor", "", f"_Update terakhir: {now_utc()}_", ""]
-    for src in sorted({i["source"] for i in indicators}, key=lambda x: x.startswith("The Fed")):
+    lines = ["# Economic Outlook Monitor", "", f"_Update terakhir: {now_utc()}_", ""]
+    for src in ["Indonesia", "Amerika Serikat (FRED)"]:
         rows = [i for i in indicators if i["source"] == src]
         if not rows:
             continue
-        lines += [f"## {src}", "", "| Indikator | Periode | Nilai |", "|---|---|---|"]
-        lines += [f"| [{r['indicator']}]({r['url']}) | {r['period']} | {r['value']} |" for r in rows]
+        lines += [f"## {src}", "", "| Kelompok | Indikator | Periode | Nilai |", "|---|---|---|---|"]
+        prev = None
+        for r in rows:
+            g = r.get("group", "")
+            lines.append(f"| {g if g != prev else ''} | [{r['indicator']}]({r['url']}) "
+                         f"| {r['period']} | {r['value']} |")
+            prev = g
         lines.append("")
     if news:
-        lines += ["## Rilis terbaru", ""]
-        lines += [f"- **{n['source']}** · {n['date']} · [{n['title']}]({n['url']})" for n in news[:20]]
+        lines += ["## Rilis terbaru The Fed", ""]
+        lines += [f"- {n['date']} · [{n['title']}]({n['url']})" for n in news[:10]]
+    lines += ["", "_Sumber: kalender ekonomi TradingView (data BPS/BI), FRED, federalreserve.gov_"]
     REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -232,18 +288,21 @@ def main():
     news = fetch_fed_news()
 
     # --- deteksi perubahan indikator
-    changed = []
+    changed, notify_list = [], []
     for ind in indicators:
         sig = f"{ind['period']}|{ind['value']}"
-        if state["values"].get(ind["key"]) != sig:
+        old = state["values"].get(ind["key"])
+        if old != sig:
             changed.append(ind)
+            if old is not None:  # indikator baru ditambahkan ke daftar -> jangan dinotifikasi
+                notify_list.append(ind)
             state["values"][ind["key"]] = sig
     if changed:
         append_history(changed)
-        if not first_run:
-            msg = "📊 Data ekonomi baru:\n" + "\n".join(
-                f"• [{c['source']}] {c['indicator']}: {c['value']} ({c['period']})" for c in changed)
-            notify(msg)
+    if notify_list and not first_run:
+        msg = "📊 Data ekonomi baru:\n" + "\n".join(
+            f"• [{c['source']}] {c['indicator']}: {c['value']} ({c['period']})" for c in notify_list)
+        notify(msg)
 
     # --- deteksi rilis/berita baru
     seen = set(state["seen_news"])
