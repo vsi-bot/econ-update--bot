@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-05 01:55 UTC",
+  "updated_at": "2026-11-05 14:03 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -78,8 +78,8 @@
       "source": "Indonesia",
       "group": "Pertumbuhan",
       "indicator": "Pertumbuhan GDP (yoy)",
-      "period": "Q2 2026",
-      "value": "5.29%",
+      "period": "Q3 2026",
+      "value": "5.47%",
       "url": "https://www.bps.go.id/"
     },
     {
@@ -87,8 +87,8 @@
       "source": "Indonesia",
       "group": "Pertumbuhan",
       "indicator": "Pertumbuhan GDP (qoq)",
-      "period": "Q2 2026",
-      "value": "3.73%",
+      "period": "Q3 2026",
+      "value": "1.59%",
       "url": "https://www.bps.go.id/"
     },
     {
@@ -186,7 +186,7 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Moneter",
       "indicator": "Fed Funds Rate - batas atas target (%)",
-      "period": "2026-11-04",
+      "period": "2026-11-05",
       "value": 4.0,
       "url": "https://fred.stlouisfed.org/series/DFEDTARU"
     },

@@ -1,6 +1,6 @@
 # Economic Outlook Monitor
 
-_Update terakhir: 2026-11-05 01:55 UTC_
+_Update terakhir: 2026-11-05 14:03 UTC_
 
 ## Indonesia
 
@@ -14,8 +14,8 @@ _Update terakhir: 2026-11-05 01:55 UTC_
 | Inflasi | [Inflasi (yoy)](https://www.bps.go.id/) | Oct. 2026 | 3.23% |
 |  | [Inflasi (mtm)](https://www.bps.go.id/) | Oct. 2026 | 0.22% |
 |  | [Inflasi inti (yoy)](https://www.bps.go.id/) | Oct. 2026 | 2.56% |
-| Pertumbuhan | [Pertumbuhan GDP (yoy)](https://www.bps.go.id/) | Q2 2026 | 5.29% |
-|  | [Pertumbuhan GDP (qoq)](https://www.bps.go.id/) | Q2 2026 | 3.73% |
+| Pertumbuhan | [Pertumbuhan GDP (yoy)](https://www.bps.go.id/) | Q3 2026 | 5.47% |
+|  | [Pertumbuhan GDP (qoq)](https://www.bps.go.id/) | Q3 2026 | 1.59% |
 |  | [Pertumbuhan GDP setahun penuh](https://www.bps.go.id/) | 2025 | 5.11% |
 | Eksternal | [Neraca perdagangan](https://www.bps.go.id/) | Sep. 2026 | US$3.36B |
 |  | [Ekspor (yoy)](https://www.bps.go.id/) | Sep. 2026 | 11.87% |
@@ -31,7 +31,7 @@ _Update terakhir: 2026-11-05 01:55 UTC_
 
 | Kelompok | Indikator | Periode | Nilai |
 |---|---|---|---|
-| Moneter | [Fed Funds Rate - batas atas target (%)](https://fred.stlouisfed.org/series/DFEDTARU) | 2026-11-04 | 4.0 |
+| Moneter | [Fed Funds Rate - batas atas target (%)](https://fred.stlouisfed.org/series/DFEDTARU) | 2026-11-05 | 4.0 |
 |  | [Fed Funds Rate efektif (%)](https://fred.stlouisfed.org/series/FEDFUNDS) | 2026-10-01 | 3.88 |
 | Inflasi | [Inflasi CPI AS (% yoy)](https://fred.stlouisfed.org/series/CPIAUCSL) | 2026-09-01 | 4.02 |
 |  | [Core PCE AS (% yoy)](https://fred.stlouisfed.org/series/PCEPILFE) | 2026-09-01 | 3.12 |
