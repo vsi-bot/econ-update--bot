@@ -1,6 +1,6 @@
 # Economic Outlook Monitor
 
-_Update terakhir: 2026-11-06 01:54 UTC_
+_Update terakhir: 2026-11-06 13:58 UTC_
 
 ## Indonesia
 
@@ -20,7 +20,7 @@ _Update terakhir: 2026-11-06 01:54 UTC_
 | Eksternal | [Neraca perdagangan](https://www.bps.go.id/) | Sep. 2026 | US$3.36B |
 |  | [Ekspor (yoy)](https://www.bps.go.id/) | Sep. 2026 | 11.87% |
 |  | [Impor (yoy)](https://www.bps.go.id/) | Sep. 2026 | 18.41% |
-|  | [Cadangan devisa](https://www.bi.go.id) | Sep. 2026 | US$146.3B |
+|  | [Cadangan devisa](https://www.bi.go.id) | Oct. 2026 | US$146.8B |
 |  | [Transaksi berjalan (% GDP)](https://www.bi.go.id) | Q2 2026 | -3.3% |
 | Konsumsi & aktivitas | [Indeks keyakinan konsumen](https://www.bi.go.id) | Sep. 2026 | 118.1 |
 |  | [Penjualan ritel (yoy)](https://www.bi.go.id) | Aug. 2026 | 1.3% |
@@ -31,7 +31,7 @@ _Update terakhir: 2026-11-06 01:54 UTC_
 
 | Kelompok | Indikator | Periode | Nilai |
 |---|---|---|---|
-| Moneter | [Fed Funds Rate - batas atas target (%)](https://fred.stlouisfed.org/series/DFEDTARU) | 2026-11-05 | 4.0 |
+| Moneter | [Fed Funds Rate - batas atas target (%)](https://fred.stlouisfed.org/series/DFEDTARU) | 2026-11-06 | 4.0 |
 |  | [Fed Funds Rate efektif (%)](https://fred.stlouisfed.org/series/FEDFUNDS) | 2026-10-01 | 3.88 |
 | Inflasi | [Inflasi CPI AS (% yoy)](https://fred.stlouisfed.org/series/CPIAUCSL) | 2026-09-01 | 4.02 |
 |  | [Core PCE AS (% yoy)](https://fred.stlouisfed.org/series/PCEPILFE) | 2026-09-01 | 3.12 |

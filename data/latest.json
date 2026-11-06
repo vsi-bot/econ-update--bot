@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-06 01:54 UTC",
+  "updated_at": "2026-11-06 13:58 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -132,8 +132,8 @@
       "source": "Indonesia",
       "group": "Eksternal",
       "indicator": "Cadangan devisa",
-      "period": "Sep. 2026",
-      "value": "US$146.3B",
+      "period": "Oct. 2026",
+      "value": "US$146.8B",
       "url": "https://www.bi.go.id"
     },
     {
@@ -186,7 +186,7 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Moneter",
       "indicator": "Fed Funds Rate - batas atas target (%)",
-      "period": "2026-11-05",
+      "period": "2026-11-06",
       "value": 4.0,
       "url": "https://fred.stlouisfed.org/series/DFEDTARU"
     },
