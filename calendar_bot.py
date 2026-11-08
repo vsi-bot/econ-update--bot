@@ -328,14 +328,35 @@ def _pack(id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_pa
 
 
 def _quiet():
-    """Enam pasar yang tidak bergerak, satu klausa datar tiap baris."""
+    """Pasar yang tidak bergerak, tetap disebut lengkap, bukan satu kata."""
     return _pack(
-        "Rupiah tidak bergerak.",
-        "Bunga BI tidak bergerak.",
-        "Saham AS tidak bergerak.",
-        "Bunga The Fed tidak bergerak.",
-        "Dolar tidak bergerak.",
-        "Harga barang antarnegara tidak bergerak.",
+        "Rupiah, harga SBN (surat utang negara), dan IHSG (saham Indonesia) tetap di tempat. BI tidak mengubah bunga.",
+        "Bunga BI tetap. Harga SBN dan IHSG tidak mendapat arah baru.",
+        "Bunga surat utang AS dan saham AS tetap. The Fed tidak mengubah bunga.",
+        "Bunga The Fed tetap. Saham AS tidak dihargai ulang.",
+        "Dolar tidak berubah, selera risiko (minat menaruh uang di aset yang untungnya tidak pasti) tetap, dan perdagangan barang tidak bergeser.",
+        "Dolar dan arus perdagangan barang tetap seperti sebelumnya. Selera risiko tidak berubah.",
+    )
+
+
+def _us_tighten(up, global_long_up, global_long_down):
+    """Dolar dan bunga AS mengeras atau melunak. Dipakai data kerja dan harga AS."""
+    if up:
+        return _pack(
+            "Rupiah melemah hari ini, harga SBN (surat utang negara) turun, dan IHSG (saham Indonesia) ikut turun. BI tidak mengubah bunga pada hari yang sama.",
+            "BI menahan bunga selama dolar tetap kuat. Harga SBN dan IHSG baru pulih setelah dolar mereda.",
+            "Bunga surat utang jangka pendek AS naik hari ini, dan saham yang butuh pinjaman murah turun. The Fed tidak mengubah bunga kebijakannya pada hari rilis.",
+            "The Fed menahan bunga lebih lama. Saham yang butuh pinjaman murah tetap tertekan selama bunga surat utang itu tinggi.",
+            "Dolar menguat terhadap euro dan yen, dan selera risiko (minat menaruh uang di aset yang untungnya tidak pasti) turun hari ini. Perdagangan barang antarnegara tidak berubah pada hari ini.",
+            global_long_up,
+        )
+    return _pack(
+        "Rupiah menguat hari ini, harga SBN (surat utang negara) naik, dan IHSG (saham Indonesia) ikut naik. BI tidak mengubah bunga pada hari yang sama.",
+        "BI mendapat ruang menurunkan bunga setelah dolar mereda. Harga SBN dan IHSG naik bersama rupiah.",
+        "Bunga surat utang jangka pendek AS turun hari ini, dan saham yang butuh pinjaman murah naik. The Fed tidak mengubah bunga kebijakannya pada hari rilis.",
+        "The Fed menurunkan bunga. Saham yang butuh pinjaman murah lega selama bunga surat utang tetap lebih rendah.",
+        "Dolar melemah terhadap euro dan yen, dan selera risiko (minat menaruh uang di aset yang untungnya tidak pasti) naik hari ini. Perdagangan barang antarnegara tidak berubah pada hari ini.",
+        global_long_down,
     )
 
 
@@ -345,62 +366,101 @@ def _market_lines(f):
         return _quiet()
     up = kind == "hot"
     if origin == "US" and family == "labor":
-        return _pack(
-            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
-            "BI menahan bunga." if up else "BI menurunkan bunga.",
-            "Bunga pinjaman jangka pendek AS naik hari ini." if up else "Bunga pinjaman jangka pendek AS turun hari ini.",
-            "The Fed menahan bunga." if up else "The Fed menurunkan bunga.",
-            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
-            "Harga barang antarnegara tidak bergerak.",
+        return _us_tighten(
+            up,
+            "Dolar yang lebih kuat membuat pinjaman di luar AS tetap mahal. Arus perdagangan barang tidak bergeser.",
+            "Pinjaman di luar AS jadi lebih murah mengikuti dolar yang lebih lemah. Arus perdagangan barang tidak bergeser.",
         )
     if origin == "US" and family == "prices":
-        return _pack(
-            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
-            "BI menahan bunga." if up else "BI menurunkan bunga.",
-            "Bunga pinjaman jangka pendek AS naik hari ini." if up else "Bunga pinjaman jangka pendek AS turun hari ini.",
-            "The Fed menahan bunga." if up else "The Fed menurunkan bunga.",
-            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
-            "Harga barang di luar AS naik." if up else "Harga barang di luar AS turun.",
+        return _us_tighten(
+            up,
+            "Harga barang di luar AS ikut naik. Dolar yang lebih kuat tetap membuat pinjaman di luar AS mahal.",
+            "Harga barang di luar AS ikut turun. Pinjaman di luar AS jadi lebih murah mengikuti dolar yang lebih lemah.",
         )
     if origin == "US" and family == "rate":
+        if up:
+            return _pack(
+                "Rupiah melemah, harga SBN turun, dan IHSG turun hari ini. BI tidak mengubah bunga pada hari yang sama.",
+                "BI menahan bunga karena bunga AS lebih tinggi dari bunga Indonesia. Harga SBN dan IHSG tetap berat selama bunga AS lebih tinggi.",
+                "The Fed menaikkan bunga hari ini. Bunga surat utang jangka pendek naik, dan saham turun.",
+                "Tagihan utang AS tetap lebih mahal. Saham baru lega setelah The Fed menurunkan bunga lagi.",
+                "Dolar menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah pada hari keputusan.",
+                "Pinjaman di luar AS jadi lebih mahal. Arus perdagangan barang tidak bergeser.",
+            )
         return _pack(
-            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
-            "BI menahan bunga." if up else "BI menurunkan bunga.",
-            "Bunga pinjaman AS naik hari ini." if up else "Bunga pinjaman AS turun hari ini.",
-            "Tagihan utang AS tetap lebih mahal." if up else "Tagihan utang AS jadi lebih murah.",
-            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
-            "Pinjaman di luar AS jadi lebih mahal." if up else "Pinjaman di luar AS jadi lebih murah.",
+            "Rupiah menguat, harga SBN naik, dan IHSG naik hari ini. BI tidak mengubah bunga pada hari yang sama.",
+            "BI menurunkan bunga setelah dolar mereda. Harga SBN dan IHSG naik bersama rupiah.",
+            "The Fed menurunkan bunga hari ini. Bunga surat utang jangka pendek turun, dan saham naik.",
+            "Tagihan utang AS jadi lebih murah. Saham yang butuh pinjaman murah tetap lebih tinggi.",
+            "Dolar melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah pada hari keputusan.",
+            "Pinjaman di luar AS jadi lebih murah. Arus perdagangan barang tidak bergeser.",
         )
     if origin == "US" and family == "guidance":
+        if up:
+            return _pack(
+                "Rupiah melemah, harga SBN turun, dan IHSG turun hari ini. BI tidak mengubah bunga pada hari pernyataan.",
+                "BI tidak mengubah bunga sebelum rapat The Fed. Harga SBN dan IHSG mengikuti dolar sampai rapat itu.",
+                "Bunga surat utang jangka pendek AS naik hari ini, dan saham turun. Bunga kebijakan The Fed belum berubah.",
+                "Bunga The Fed baru berubah pada rapat berikutnya. Saham mengikuti bunga surat utang sampai rapat itu.",
+                "Dolar menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah.",
+                "Dolar tetap lebih kuat kalau The Fed menahan bunga di rapat berikut. Arus perdagangan barang tidak bergeser.",
+            )
         return _pack(
-            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
-            "Bunga BI tidak bergerak.",
-            "Bunga pinjaman jangka pendek AS naik hari ini." if up else "Bunga pinjaman jangka pendek AS turun hari ini.",
-            "Bunga The Fed tidak bergerak.",
-            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
-            "Harga barang antarnegara tidak bergerak.",
+            "Rupiah menguat, harga SBN naik, dan IHSG naik hari ini. BI tidak mengubah bunga pada hari pernyataan.",
+            "BI belum menurunkan bunga sebelum rapat The Fed. Harga SBN dan IHSG mengikuti dolar sampai rapat itu.",
+            "Bunga surat utang jangka pendek AS turun hari ini, dan saham naik. Bunga kebijakan The Fed belum berubah.",
+            "Bunga The Fed baru berubah pada rapat berikutnya. Saham mengikuti bunga surat utang sampai rapat itu.",
+            "Dolar melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah.",
+            "Dolar tetap lebih lemah kalau The Fed menurunkan bunga di rapat berikut. Arus perdagangan barang tidak bergeser.",
         )
     if origin == "US" and family == "growth":
+        if up:
+            return _pack(
+                "Rupiah melemah dan harga SBN turun hari ini, sementara saham ekspor di IHSG naik. BI tidak mengubah bunga pada hari yang sama.",
+                "BI menahan bunga selama dolar kuat. Saham ekspor di IHSG tetap lebih diuntungkan daripada saham yang butuh pinjaman murah.",
+                "Saham perusahaan yang menjual barang naik hari ini, dan bunga surat utang jangka pendek ikut naik. The Fed belum mengubah bunga kebijakannya.",
+                "The Fed menahan bunga. Saham penjual barang tetap lebih kuat daripada saham yang butuh pinjaman murah.",
+                "Dolar menguat, dan selera risiko naik untuk saham barang, bukan untuk utang. Perdagangan belum berubah hari ini.",
+                "Pesanan barang dari AS bertambah. Dolar yang kuat tetap membuat pinjaman di luar AS mahal.",
+            )
         return _pack(
-            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
-            "BI menahan bunga." if up else "BI menurunkan bunga.",
-            "Saham perusahaan AS naik hari ini." if up else "Saham perusahaan AS turun hari ini.",
-            "The Fed menahan bunga." if up else "The Fed menurunkan bunga.",
-            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
-            "Pesanan barang dari AS bertambah." if up else "Pesanan barang dari AS berkurang.",
+            "Rupiah menguat dan harga SBN naik hari ini, sementara saham ekspor di IHSG turun. BI tidak mengubah bunga pada hari yang sama.",
+            "BI menurunkan bunga setelah dolar mereda. Saham ekspor di IHSG tetap lebih lemah karena pesanan dari AS susut.",
+            "Saham perusahaan yang menjual barang turun hari ini, dan bunga surat utang jangka pendek ikut turun. The Fed belum mengubah bunga kebijakannya.",
+            "The Fed menurunkan bunga. Saham penjual barang tetap lebih lemah meskipun pinjaman lebih murah.",
+            "Dolar melemah, dan selera risiko turun untuk saham barang. Perdagangan belum berubah hari ini.",
+            "Pesanan barang dari AS berkurang. Pinjaman di luar AS jadi lebih murah mengikuti dolar yang lebih lemah.",
         )
     if origin == "US" and family == "activity":
+        if up:
+            return _pack(
+                "Rupiah melemah dan harga SBN turun hari ini, dan IHSG ikut turun. BI tidak mengubah bunga.",
+                "Bunga BI tetap. Harga SBN dan IHSG kembali kalau angka bulan depan berlawanan arah.",
+                "Saham perusahaan AS naik hari ini, dan bunga surat utang jangka pendek ikut naik. The Fed tidak mengubah bunga.",
+                "Bunga The Fed tetap. Saham AS mudah kembali ke posisi semula pada angka bulan depan.",
+                "Dolar menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah.",
+                "Dolar dan arus perdagangan barang kembali ke posisi semula kalau angka berikutnya berlawanan arah.",
+            )
         return _pack(
-            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
-            "Bunga BI tidak bergerak.",
-            "Saham perusahaan AS naik hari ini." if up else "Saham perusahaan AS turun hari ini.",
-            "Bunga The Fed tidak bergerak.",
-            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
-            "Harga barang antarnegara tidak bergerak.",
+            "Rupiah menguat dan harga SBN naik hari ini, dan IHSG ikut naik. BI tidak mengubah bunga.",
+            "Bunga BI tetap. Harga SBN dan IHSG kembali kalau angka bulan depan berlawanan arah.",
+            "Saham perusahaan AS turun hari ini, dan bunga surat utang jangka pendek ikut turun. The Fed tidak mengubah bunga.",
+            "Bunga The Fed tetap. Saham AS mudah kembali ke posisi semula pada angka bulan depan.",
+            "Dolar melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah.",
+            "Dolar dan arus perdagangan barang kembali ke posisi semula kalau angka berikutnya berlawanan arah.",
         )
     if origin == "US" and family == "trade":
         lines = _quiet()
-        lines["global_pendek"] = "Dolar menguat hari ini." if up else "Dolar melemah hari ini."
+        lines["global_pendek"] = (
+            "Dolar menguat hari ini. Selera risiko tetap, dan perdagangan barang tidak berubah pada hari rilis."
+            if up else
+            "Dolar melemah hari ini. Selera risiko tetap, dan perdagangan barang tidak berubah pada hari rilis."
+        )
+        lines["global_panjang"] = (
+            "Dolar yang lebih kuat tidak mengubah arus barang. Selera risiko tetap."
+            if up else
+            "Dolar yang lebih lemah tidak mengubah arus barang. Selera risiko tetap."
+        )
         return lines
     if origin == "US" and family == "reserves":
         return _quiet()
@@ -409,22 +469,40 @@ def _market_lines(f):
     if origin == "CN":
         return _cn_lines(f, up)
     if origin == "JP" and family == "rate":
+        if up:
+            return _pack(
+                "IHSG turun hari ini karena orang menjual aset yang dibiayai yen. Rupiah ikut melemah, harga SBN turun, dan BI tidak mengubah bunga.",
+                "BI tidak mengubah bunga. IHSG dan harga SBN tetap lebih berat selama pinjaman yen mahal.",
+                "Saham AS turun hari ini, dan bunga surat utang jangka panjang naik karena posisi yen ditutup. The Fed tidak mengubah bunga.",
+                "Bunga The Fed tetap. Saham AS tetap lebih rendah selama pinjaman yen mahal.",
+                "Yen menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah.",
+                "Pinjaman dalam yen jadi lebih mahal. Arus perdagangan barang tidak bergeser.",
+            )
         return _pack(
-            "Saham Indonesia turun hari ini." if up else "Saham Indonesia naik hari ini.",
-            "Bunga BI tidak bergerak.",
-            "Saham AS turun hari ini." if up else "Saham AS naik hari ini.",
-            "Bunga The Fed tidak bergerak.",
-            "Yen menguat hari ini." if up else "Yen melemah hari ini.",
-            "Pinjaman dalam yen jadi lebih mahal." if up else "Pinjaman dalam yen jadi lebih murah.",
+            "IHSG naik hari ini karena pinjaman yen murah hidup lagi. Rupiah ikut menguat, harga SBN naik, dan BI tidak mengubah bunga.",
+            "BI tidak mengubah bunga. IHSG dan harga SBN tetap lebih tinggi selama pinjaman yen murah.",
+            "Saham AS naik hari ini. Bunga surat utang AS tidak berubah besar, dan The Fed tidak mengubah bunga.",
+            "Bunga The Fed tetap. Saham AS tetap lebih tinggi selama pinjaman yen murah.",
+            "Yen melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah.",
+            "Pinjaman dalam yen jadi lebih murah. Arus perdagangan barang tidak bergeser.",
         )
     if origin == "EU" and family == "rate":
+        if up:
+            return _pack(
+                "Rupiah, harga SBN, dan IHSG tidak bergerak hari ini. BI tidak mengubah bunga.",
+                "Bunga BI tetap, karena BI mengikuti The Fed, bukan bank sentral Eropa. Harga SBN dan IHSG tidak mendapat arah baru.",
+                "Bunga surat utang AS dan saham AS tidak bergerak. The Fed tidak mengubah bunga.",
+                "Bunga The Fed tetap. Saham AS tidak mengikuti keputusan Eropa.",
+                "Euro menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah.",
+                "Bunga pinjaman di Eropa naik. Dolar tetap, dan arus perdagangan barang tidak bergeser.",
+            )
         return _pack(
-            "Rupiah tidak bergerak.",
-            "Bunga BI tidak bergerak.",
-            "Saham AS tidak bergerak.",
-            "Bunga The Fed tidak bergerak.",
-            "Euro menguat hari ini." if up else "Euro melemah hari ini.",
-            "Bunga pinjaman di Eropa naik." if up else "Bunga pinjaman di Eropa turun.",
+                "Rupiah, harga SBN, dan IHSG tidak bergerak hari ini. BI tidak mengubah bunga.",
+                "Bunga BI tetap. Harga SBN dan IHSG tidak mendapat arah baru dari Eropa.",
+                "Bunga surat utang AS dan saham AS tidak bergerak. The Fed tidak mengubah bunga.",
+                "Bunga The Fed tetap. Saham AS tidak mengikuti keputusan Eropa.",
+                "Euro melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah.",
+                "Bunga pinjaman di Eropa turun. Dolar tetap, dan arus perdagangan barang tidak bergeser.",
         )
     return _other_lines(f, up)
 
@@ -433,75 +511,175 @@ def _id_lines(f, up):
     family = f["family"]
     lines = _quiet()
     if family == "rate":
-        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
-        lines["id_panjang"] = "Bunga pinjaman di Indonesia naik." if up else "Bunga pinjaman di Indonesia turun."
+        lines["id_pendek"] = (
+            "Rupiah menguat dan harga SBN turun hari ini. Di IHSG, saham bank diuntungkan dan saham properti tertekan, karena BI menaikkan bunga."
+            if up else
+            "Rupiah melemah dan harga SBN naik hari ini. Di IHSG, saham properti naik dan saham bank tertekan, karena BI menurunkan bunga."
+        )
+        lines["id_panjang"] = (
+            "Bunga pinjaman di dalam negeri tetap lebih mahal. BI baru menurunkan bunga setelah rupiah aman."
+            if up else
+            "Bunga pinjaman di dalam negeri lebih murah. BI tidak menurunkannya jauh di bawah The Fed, supaya rupiah tidak jatuh lagi."
+        )
     elif family == "prices":
-        lines["id_pendek"] = "Harga barang di Indonesia naik." if up else "Harga barang di Indonesia turun."
-        lines["id_panjang"] = "BI menahan bunga." if up else "BI menurunkan bunga."
+        lines["id_pendek"] = (
+            "Harga barang naik, harga SBN turun, dan saham konsumen di IHSG turun hari ini. BI menahan bunga."
+            if up else
+            "Harga barang lebih tenang, harga SBN naik, dan saham konsumen di IHSG naik hari ini. BI mendapat ruang menurunkan bunga."
+        )
+        lines["id_panjang"] = (
+            "Daya beli menipis dan BI menahan bunga. Harga SBN baru naik setelah harga barang reda."
+            if up else
+            "Daya beli lega dan BI menurunkan bunga. Harga SBN tetap lebih tinggi selama harga barang tenang."
+        )
     elif family == "labor":
-        lines["id_pendek"] = "Saham perusahaan Indonesia naik hari ini." if up else "Saham perusahaan Indonesia turun hari ini."
-        lines["id_panjang"] = "BI menahan bunga." if up else "BI menurunkan bunga."
+        lines["id_pendek"] = (
+            "IHSG naik karena belanja rumah tangga lebih kuat. Rupiah dan harga SBN tidak bergerak hari ini, dan BI tidak mengubah bunga."
+            if up else
+            "IHSG turun karena belanja rumah tangga lebih lemah. Rupiah ikut melemah, harga SBN turun, dan BI tidak mengubah bunga hari ini."
+        )
+        lines["id_panjang"] = (
+            "BI menahan bunga. Saham konsumen di IHSG tetap lebih kuat selama lowongan banyak."
+            if up else
+            "BI menurunkan bunga. Saham konsumen di IHSG tetap lebih lemah selama lowongan sepi."
+        )
     elif family == "growth":
-        lines["id_pendek"] = "Saham Indonesia naik hari ini." if up else "Saham Indonesia turun hari ini."
-        lines["id_panjang"] = "BI menahan bunga." if up else "BI menurunkan bunga."
+        lines["id_pendek"] = (
+            "IHSG naik dan rupiah menguat hari ini. Harga SBN ikut naik. BI tidak mengubah bunga pada hari rilis."
+            if up else
+            "IHSG turun dan rupiah melemah hari ini. Harga SBN ikut turun. BI tidak mengubah bunga pada hari rilis."
+        )
+        lines["id_panjang"] = (
+            "BI menahan bunga karena ekonomi dalam negeri sudah kuat. IHSG tetap lebih tinggi selama pertumbuhan ini bertahan."
+            if up else
+            "BI menurunkan bunga. IHSG tetap lebih rendah selama ekonomi dalam negeri melambat."
+        )
     elif family == "activity":
-        lines["id_pendek"] = "Saham Indonesia naik hari ini." if up else "Saham Indonesia turun hari ini."
+        lines["id_pendek"] = (
+            "IHSG naik hari ini. Rupiah dan harga SBN tidak bergerak, dan BI tidak mengubah bunga."
+            if up else
+            "IHSG turun hari ini. Rupiah dan harga SBN tidak bergerak, dan BI tidak mengubah bunga."
+        )
+        lines["id_panjang"] = (
+            "Bunga BI tetap. IHSG kembali kalau angka bulan depan berlawanan arah."
+        )
     elif family == "trade":
-        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
+        lines["id_pendek"] = (
+            "Rupiah menguat hari ini. Harga SBN naik, saham ekspor di IHSG naik, dan BI tidak mengubah bunga."
+            if up else
+            "Rupiah melemah hari ini. Harga SBN turun, saham ekspor di IHSG turun, dan BI tidak mengubah bunga."
+        )
+        lines["id_panjang"] = (
+            "BI tidak mengubah bunga. Rupiah tetap lebih kuat selama uang dari luar tetap masuk."
+            if up else
+            "BI menahan bunga untuk menjaga rupiah. Rupiah tetap lebih lemah selama uang dari luar tetap keluar."
+        )
     elif family == "reserves":
-        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
-        if not up:
-            lines["id_panjang"] = "BI menahan bunga."
+        lines["id_pendek"] = (
+            "Rupiah menguat hari ini karena BI punya lebih banyak dolar untuk menjaganya. Harga SBN dan IHSG tidak bergerak, dan bunga BI tidak berubah."
+            if up else
+            "Rupiah melemah hari ini karena cadangan dolar BI berkurang. Harga SBN turun, IHSG tidak bergerak, dan BI menahan bunga."
+        )
+        lines["id_panjang"] = (
+            "BI lebih mampu menahan pelemahan rupiah. Bunga BI tetap, dan harga SBN mengikuti rupiah."
+            if up else
+            "BI lebih sulit menjaga rupiah tanpa menaikkan bunga. Harga SBN tetap lebih rendah selama cadangan menipis."
+        )
     elif family == "guidance":
-        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
-        lines["id_panjang"] = "BI menahan bunga." if up else "BI menurunkan bunga."
-    else:
-        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
+        lines["id_pendek"] = (
+            "Rupiah menguat dan harga SBN turun hari ini. Saham yang butuh pinjaman murah di IHSG turun. BI belum mengubah bunga pada hari pernyataan."
+            if up else
+            "Rupiah melemah dan harga SBN naik hari ini. Saham yang butuh pinjaman murah di IHSG naik. BI belum mengubah bunga pada hari pernyataan."
+        )
+        lines["id_panjang"] = (
+            "BI menahan bunga pada rapat berikutnya. Harga SBN dan IHSG mengikuti keputusan itu."
+            if up else
+            "BI menurunkan bunga pada rapat berikutnya. Harga SBN dan IHSG mengikuti keputusan itu."
+        )
     return lines
 
 
 def _cn_lines(f, up):
     family = f["family"]
     if family in ("growth", "activity"):
+        if up:
+            return _pack(
+                "Harga batu bara, nikel, dan sawit naik hari ini, sahamnya di IHSG naik, dan rupiah menguat. Harga SBN tidak bergerak, dan BI tidak mengubah bunga.",
+                "Ekspor Indonesia ke China bertambah. BI tidak mengubah bunga, dan harga SBN mengikuti rupiah.",
+                "Saham AS yang menjual ke Asia naik hari ini. Bunga surat utang AS tidak bergerak, dan The Fed tidak mengubah bunga.",
+                "Bunga The Fed tetap. Saham AS yang menjual ke Asia mengikuti permintaan China, bukan bunga The Fed.",
+                "Harga logam naik dan selera risiko untuk barang naik hari ini. Dolar tidak bergerak, dan perdagangan barang belum berubah pada hari rilis.",
+                "Pesanan pabrik di luar China bertambah. Dolar tidak berubah.",
+            )
         return _pack(
-            "Harga batu bara, nikel, dan sawit naik hari ini." if up else "Harga batu bara, nikel, dan sawit turun hari ini.",
-            "Ekspor Indonesia ke China bertambah." if up else "Ekspor Indonesia ke China berkurang.",
-            "Saham AS tidak bergerak.",
-            "Bunga The Fed tidak bergerak.",
-            "Harga logam naik hari ini." if up else "Harga logam turun hari ini.",
-            "Pesanan pabrik di luar China bertambah." if up else "Pesanan pabrik di luar China berkurang.",
+            "Harga batu bara, nikel, dan sawit turun hari ini, sahamnya di IHSG turun, dan rupiah melemah. Harga SBN turun, dan BI tidak mengubah bunga.",
+            "Ekspor Indonesia ke China berkurang. BI tidak mengubah bunga, dan harga SBN mengikuti rupiah.",
+            "Saham AS yang menjual ke Asia turun hari ini. Bunga surat utang AS tidak bergerak, dan The Fed tidak mengubah bunga.",
+            "Bunga The Fed tetap. Saham AS yang menjual ke Asia mengikuti permintaan China, bukan bunga The Fed.",
+            "Harga logam turun dan selera risiko untuk barang turun hari ini. Dolar tidak bergerak, dan perdagangan barang belum berubah pada hari rilis.",
+            "Pesanan pabrik di luar China berkurang. Dolar tidak berubah.",
         )
     if family == "rate":
+        if up:
+            return _pack(
+                "Harga batu bara, nikel, dan sawit turun hari ini, dan sahamnya di IHSG turun. Rupiah melemah, harga SBN ikut turun, dan BI tidak mengubah bunga.",
+                "Ekspor Indonesia ke China berkurang. BI tidak mengubah bunga.",
+                "Saham AS yang menjual ke Asia turun hari ini. Bunga surat utang AS dan The Fed tidak berubah.",
+                "Bunga The Fed tetap. Saham AS tidak mengikuti bunga China.",
+                "Harga logam turun dan selera risiko untuk barang turun hari ini. Dolar tidak bergerak.",
+                "Pinjaman di China jadi lebih mahal. Arus perdagangan barang di luar China menyusut.",
+            )
         return _pack(
-            "Harga batu bara, nikel, dan sawit turun hari ini." if up else "Harga batu bara, nikel, dan sawit naik hari ini.",
-            "Ekspor Indonesia ke China berkurang." if up else "Ekspor Indonesia ke China bertambah.",
-            "Saham AS tidak bergerak.",
-            "Bunga The Fed tidak bergerak.",
-            "Harga logam turun hari ini." if up else "Harga logam naik hari ini.",
-            "Pinjaman di China jadi lebih mahal." if up else "Pinjaman di China jadi lebih murah.",
+            "Harga batu bara, nikel, dan sawit naik hari ini, dan sahamnya di IHSG naik. Rupiah menguat, harga SBN ikut naik, dan BI tidak mengubah bunga.",
+            "Ekspor Indonesia ke China bertambah. BI tidak mengubah bunga.",
+            "Saham AS yang menjual ke Asia naik hari ini. Bunga surat utang AS dan The Fed tidak berubah.",
+            "Bunga The Fed tetap. Saham AS tidak mengikuti bunga China.",
+            "Harga logam naik dan selera risiko untuk barang naik hari ini. Dolar tidak bergerak.",
+            "Pinjaman di China jadi lebih murah. Arus perdagangan barang di luar China bertambah.",
         )
     if family == "prices":
+        if up:
+            return _pack(
+                "Harga SBN, rupiah, dan IHSG tidak bergerak hari ini. BI tidak mengubah bunga.",
+                "Ekspor Indonesia ke China tidak bertambah. Harga SBN dan bunga BI tetap.",
+                "Bunga surat utang AS dan saham AS tidak bergerak. The Fed tidak mengubah bunga.",
+                "Bunga The Fed tetap. Saham AS tidak mengikuti harga di China.",
+                "Harga barang dari China naik. Dolar dan selera risiko tidak berubah hari ini.",
+                "Bunga di China tetap tinggi. Arus perdagangan barang baru berubah setelah harga ini bertahan.",
+            )
         return _pack(
-            "Harga batu bara, nikel, dan sawit tidak bergerak." if up else "Harga batu bara, nikel, dan sawit naik hari ini.",
-            "Ekspor Indonesia ke China tidak bertambah." if up else "Ekspor Indonesia ke China bertambah.",
-            "Saham AS tidak bergerak.",
-            "Bunga The Fed tidak bergerak.",
-            "Harga barang dari China naik." if up else "Harga barang dari China turun.",
-            "Bunga di China tetap tinggi." if up else "Bunga di China turun.",
+            "Harga batu bara, nikel, dan sawit naik hari ini, sahamnya di IHSG naik. Rupiah menguat, dan BI tidak mengubah bunga hari ini.",
+            "Ekspor Indonesia ke China bertambah. Harga SBN naik mengikuti rupiah.",
+            "Bunga surat utang AS dan saham AS tidak bergerak. The Fed tidak mengubah bunga.",
+            "Bunga The Fed tetap. Saham AS tidak mengikuti harga di China.",
+            "Harga barang dari China turun, dan selera risiko untuk barang naik hari ini. Dolar tidak bergerak.",
+            "Bunga di China turun. Pesanan barang dari China bertambah.",
         )
     if family == "labor":
         lines = _quiet()
-        lines["id_panjang"] = ("Ekspor barang jadi Indonesia ke China bertambah." if up else
-                               "Ekspor barang jadi Indonesia ke China berkurang.")
+        lines["id_panjang"] = (
+            "Ekspor barang jadi Indonesia ke China bertambah. Bunga BI, harga SBN, dan rupiah tidak berubah karenanya."
+            if up else
+            "Ekspor barang jadi Indonesia ke China berkurang. Bunga BI, harga SBN, dan rupiah tidak berubah karenanya."
+        )
         return lines
     if family == "guidance":
+        if up:
+            return _pack(
+                "Harga batu bara, nikel, dan sawit turun hari ini, dan sahamnya di IHSG turun. Rupiah dan harga SBN tidak bergerak, dan BI tidak mengubah bunga.",
+                "Ekspor Indonesia ke China berkurang kalau pinjaman di China ikut mengetat. BI tidak mengubah bunga.",
+                "Saham AS yang menjual ke Asia turun hari ini. Bunga surat utang AS dan The Fed tidak berubah.",
+                "Bunga The Fed tetap. Saham AS tidak mengikuti pernyataan China.",
+                "Harga logam turun dan selera risiko untuk barang turun hari ini. Dolar tidak bergerak.",
+                "Bunga di China belum berubah pada hari pernyataan. Arus perdagangan baru berubah setelah bunga itu benar-benar naik.",
+            )
         return _pack(
-            "Harga batu bara, nikel, dan sawit turun hari ini." if up else "Harga batu bara, nikel, dan sawit naik hari ini.",
-            "Ekspor Indonesia ke China berkurang." if up else "Ekspor Indonesia ke China bertambah.",
-            "Saham AS tidak bergerak.",
-            "Bunga The Fed tidak bergerak.",
-            "Harga logam turun hari ini." if up else "Harga logam naik hari ini.",
-            "Bunga di China tidak bergerak.",
+            "Harga batu bara, nikel, dan sawit naik hari ini, dan sahamnya di IHSG naik. Rupiah menguat, harga SBN ikut naik, dan BI tidak mengubah bunga.",
+            "Ekspor Indonesia ke China bertambah kalau pinjaman di China ikut murah. BI tidak mengubah bunga.",
+            "Saham AS yang menjual ke Asia naik hari ini. Bunga surat utang AS dan The Fed tidak berubah.",
+            "Bunga The Fed tetap. Saham AS tidak mengikuti pernyataan China.",
+            "Harga logam naik dan selera risiko untuk barang naik hari ini. Dolar tidak bergerak.",
+            "Bunga di China belum berubah pada hari pernyataan. Arus perdagangan baru berubah setelah bunga itu benar-benar turun.",
         )
     return _quiet()
 
@@ -510,9 +688,25 @@ def _other_lines(f, up):
     family, place = f["family"], f["place"]
     lines = _quiet()
     if family in ("prices", "labor", "rate", "guidance"):
-        lines["global_panjang"] = f"Bunga di {place} naik." if up else f"Bunga di {place} turun."
+        lines["global_pendek"] = (
+            f"Dolar tidak bergerak dan selera risiko global tetap. Bunga di {place} naik, dan perdagangan barang tidak berubah hari ini."
+            if up else
+            f"Dolar tidak bergerak dan selera risiko global tetap. Bunga di {place} turun, dan perdagangan barang tidak berubah hari ini."
+        )
+        lines["global_panjang"] = (
+            f"Bunga di {place} tetap lebih tinggi. Dolar, selera risiko, dan arus perdagangan barang tidak ikut."
+            if up else
+            f"Bunga di {place} tetap lebih rendah. Dolar, selera risiko, dan arus perdagangan barang tidak ikut."
+        )
     elif family in ("growth", "activity"):
-        lines["global_panjang"] = f"Pesanan dari {place} bertambah." if up else f"Pesanan dari {place} berkurang."
+        lines["global_pendek"] = (
+            f"Dolar dan selera risiko global tidak berubah hari ini. Perdagangan dengan {place} belum berubah pada hari rilis."
+        )
+        lines["global_panjang"] = (
+            f"Pesanan dari {place} bertambah. Dolar dan selera risiko tidak ikut berubah."
+            if up else
+            f"Pesanan dari {place} berkurang. Dolar dan selera risiko tidak ikut berubah."
+        )
     return lines
 
 
@@ -530,7 +724,7 @@ def _strip_fact(f, text):
 def market_views(ev):
     f = _facts(ev)
     lines = _market_lines(f)
-    return {k: _clip(_strip_fact(f, lines.get(k)), 280) for k in MARKET_KEYS}
+    return {k: _clip(_strip_fact(f, lines.get(k)), 520) for k in MARKET_KEYS}
 
 def build_macro_read(ev):
     read = market_views(ev)
@@ -593,13 +787,14 @@ def llm_analysis(ev, level, read, next_txt):
         "(lebih banyak orang dapat kerja, harga naik lebih cepat, bunga lebih tinggi). "
         "Jangan tulis akibat ke rupiah, bunga, saham, atau dolar di ringkasan.\n"
         "id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang: "
-        "masing-masing SATU kalimat, dan keenamnya harus berbeda.\n"
+        "masing-masing SATU atau DUA kalimat pendek, padat, dan lengkap. Keenamnya harus berbeda.\n"
         "Jangan ulang nama indikator. Jangan ulang kalimat fakta dari ringkasan. "
-        "Jangan pakai kata biasanya bersama bisa. Jangan menulis 'karena satu laporan'.\n"
-        "Tiap kalimat adalah satu akibat yang bisa dibayangkan: rupiah, bunga, saham, atau dolar. "
+        "Jangan pakai biasanya, bisa, atau kalimat pengisi.\n"
+        "Indonesia: sebut rupiah, SBN (surat utang negara), IHSG (saham Indonesia), dan BI.\n"
+        "Amerika: sebut bunga surat utang, saham, dan The Fed.\n"
+        "Global: sebut dolar, selera risiko (minat menaruh uang di aset yang untungnya tidak pasti), dan perdagangan barang.\n"
         "Jangka pendek artinya hari rilis. Jangka panjang artinya beberapa bulan ke depan.\n"
-        "Kalau pasar itu tidak bergerak, tulis satu klausa datar, contoh: 'Rupiah tidak bergerak.' "
-        "Jangan menjelaskan kenapa.\n\n"
+        "Kalau suatu harga tidak bergerak, katakan di dalam kalimat yang sama, jangan sebagai pengumuman terpisah yang kosong.\n\n"
         f"Data: {json.dumps(payload, ensure_ascii=False)}\n"
         f"Kategori dampak ke Indonesia: {level}\n"
         f"Rilis berikutnya: {next_txt}\n"
@@ -611,7 +806,7 @@ def llm_analysis(ev, level, read, next_txt):
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01",
                      "content-type": "application/json"},
-            json={"model": CLAUDE_MODEL, "max_tokens": 900,
+            json={"model": CLAUDE_MODEL, "max_tokens": 1400,
                   "messages": [{"role": "user", "content": prompt}]},
             timeout=60,
         )
