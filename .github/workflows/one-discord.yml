@@ -1,35 +1,15 @@
 name: One Discord send
 
-# Sekali jalan: push yang mengubah file ini mengirim satu rilis terakhir ke Discord.
-# Tidak memanggil Sheets dan tidak mengubah state posted.
+# Sudah terkirim sekali (HTTP 200). Tidak ada trigger push, supaya tidak dobel.
 on:
-  push:
-    branches:
-      - cursor/discord-layout-chart-5a96
-    paths:
-      - .github/workflows/one-discord.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: one-discord-send
-  cancel-in-progress: false
-
 jobs:
   send:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install --quiet requests matplotlib
-      - name: Satu rilis ke Discord
-        run: python calendar_bot.py
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          COUNTRIES: ID,US,CN,EU,JP
-          MIN_ALERT: SEDANG
-          TEST_SEND: "1"
+      - run: echo "satu kiriman sudah selesai"
