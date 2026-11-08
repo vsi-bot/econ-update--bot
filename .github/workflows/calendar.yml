@@ -8,6 +8,12 @@ on:
     #   18-19 UTC = 01:00-02:59 WIB -> keputusan FOMC
     - cron: "*/15 0-7,12-15,18-19 * * 1-5"
   workflow_dispatch:
+    inputs:
+      test_send:
+        description: Kirim satu rilis terakhir ke Discord saja
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: repo-write
@@ -28,6 +34,7 @@ jobs:
           cache: pip
       - run: pip install --quiet requests matplotlib
       - name: Jalankan calendar bot
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.test_send != true }}
         run: python calendar_bot.py
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -36,6 +43,14 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COUNTRIES: ID,US,CN,EU,JP
           MIN_ALERT: SEDANG
+      - name: Satu rilis ke Discord
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_send == true }}
+        run: python calendar_bot.py
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          COUNTRIES: ID,US,CN,EU,JP
+          MIN_ALERT: SEDANG
+          TEST_SEND: "1"
       - name: Simpan state
         if: always()
         run: |

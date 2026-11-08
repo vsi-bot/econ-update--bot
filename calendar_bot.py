@@ -1228,6 +1228,12 @@ def fmt_wib(d):
     return f"{HARI[w.weekday()]}, {w.day:02d} {BULAN[w.month - 1]} {w.year} {w:%H:%M} WIB"
 
 
+def _short_wib(d):
+    """Tanggal singkat supaya kolom embed Discord tetap sejajar."""
+    w = d.astimezone(WIB)
+    return f"{w.day:02d} {BULAN[w.month - 1]} · {w:%H:%M}"
+
+
 def fmt_val(ev, key):
     v = ev.get(key)
     if v is None:
@@ -1298,7 +1304,10 @@ def discord(embeds, content=None, png=None):
             if r.status_code == 429:
                 time.sleep(float(r.json().get("retry_after", 2)))
                 continue
+            if r.status_code >= 400:
+                log.warning("Discord menolak pesan: HTTP %s", r.status_code)
             r.raise_for_status()
+            log.info("Discord menerima pesan (HTTP %s)", r.status_code)
             break
         time.sleep(1)
 
@@ -1336,8 +1345,67 @@ def history_events(now):
     return _HISTORY
 
 
+def _smooth_curve(xs, ys, n=200):
+    """Kurva mulus yang tetap lewat tiap actual. PCHIP, jadi tidak menyimpang di puncak/dasar."""
+    import numpy as np
+    xs = np.asarray(xs, dtype=float)
+    ys = np.asarray(ys, dtype=float)
+    order = np.argsort(xs)
+    xs, ys = xs[order], ys[order]
+    keep = np.concatenate([[True], np.diff(xs) > 0])
+    xs, ys = xs[keep], ys[keep]
+    if len(xs) < 3:
+        return xs, ys
+    h = np.diff(xs)
+    delta = np.diff(ys) / h
+    m = np.zeros(len(ys))
+    m[0] = delta[0]
+    m[-1] = delta[-1]
+    for i in range(1, len(ys) - 1):
+        if delta[i - 1] == 0 or delta[i] == 0 or delta[i - 1] * delta[i] < 0:
+            m[i] = 0.0
+        else:
+            w1 = 2 * h[i] + h[i - 1]
+            w2 = h[i] + 2 * h[i - 1]
+            m[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i])
+    for i in range(len(delta)):
+        if delta[i] == 0:
+            m[i] = 0.0
+            m[i + 1] = 0.0
+            continue
+        a = m[i] / delta[i]
+        b = m[i + 1] / delta[i]
+        hyp = a * a + b * b
+        if hyp > 9:
+            scale = 3 / np.sqrt(hyp)
+            m[i] = scale * a * delta[i]
+            m[i + 1] = scale * b * delta[i]
+    grid = np.linspace(xs[0], xs[-1], n)
+    seg = np.clip(np.searchsorted(xs, grid, side="right") - 1, 0, len(ys) - 2)
+    out = np.empty_like(grid)
+    for i in range(len(ys) - 1):
+        mask = seg == i
+        if not np.any(mask):
+            continue
+        t = (grid[mask] - xs[i]) / h[i]
+        t2, t3 = t * t, t * t * t
+        out[mask] = ((2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h[i] * m[i]
+                     + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h[i] * m[i + 1])
+    return grid, out
+
+
+def _extreme_index(vals, when, want_max):
+    best = 0
+    for i in range(1, len(vals)):
+        higher = vals[i] > vals[best] if want_max else vals[i] < vals[best]
+        later_tie = vals[i] == vals[best] and when[i] > when[best]
+        if higher or later_tie:
+            best = i
+    return best
+
+
 def make_chart(ev, now):
-    """Grafik Actual vs Forecast 24 rilis terakhir untuk indikator ini. Return PNG bytes / None."""
+    """Grafik Actual vs Forecast. Garis actual dimuluskan, puncak dan dasar diberi bulan."""
     try:
         import io as _io
         import matplotlib
@@ -1359,18 +1427,35 @@ def make_chart(ev, now):
     fc = [e.get("forecast") for e in pts]
     suffix = (ev.get("scale") or "") + ("%" if ev.get("unit") == "%" else "")
 
-    fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
+    fig, ax = plt.subplots(figsize=(8, 4.3), dpi=150)
     fig.patch.set_facecolor("white")
-    ax.fill_between(x, act, min(act + [v for v in fc if v is not None]),
-                    color=BRAND_SOFT, alpha=0.7, zorder=1)
-    ax.plot(x, act, color=BRAND_RED, lw=2.4, marker="o", ms=4, zorder=3, label="Actual")
+    xs = mdates.date2num(x)
+    smooth_x, smooth_y = _smooth_curve(xs, act)
+    smooth_when = mdates.num2date(smooth_x)
+    floor = min(act + [v for v in fc if v is not None])
+    ax.fill_between(smooth_when, smooth_y, floor, color=BRAND_SOFT, alpha=0.85, zorder=1)
+    ax.plot(smooth_when, smooth_y, color=BRAND_RED, lw=2.6, zorder=3, label="Actual", solid_capstyle="round")
+    ax.plot(x, act, linestyle="none", marker="o", ms=4.5, color=BRAND_RED, zorder=4)
     fx = [(a, b) for a, b in zip(x, fc) if b is not None]
     if fx:
-        ax.plot([a for a, _ in fx], [b for _, b in fx], color=BRAND_DARK, lw=1.6,
+        ax.plot([a for a, _ in fx], [b for _, b in fx], color=BRAND_DARK, lw=1.5,
                 ls=(0, (4, 3)), zorder=2, label="Forecast/Konsensus")
-    ax.scatter([x[-1]], [act[-1]], s=70, color=BRAND_RED, edgecolor="white", lw=2, zorder=4)
-    ax.annotate(f"{act[-1]:g}{suffix}", (x[-1], act[-1]), xytext=(-10, 10), ha="right",
+    ax.scatter([x[-1]], [act[-1]], s=70, color=BRAND_RED, edgecolor="white", lw=2, zorder=5)
+    ax.annotate(f"{act[-1]:g}{suffix}", (x[-1], act[-1]), xytext=(-8, 12), ha="right",
                 textcoords="offset points", color=BRAND_RED, fontsize=11, fontweight="bold")
+
+    peak_i = _extreme_index(act, x, True)
+    trough_i = _extreme_index(act, x, False)
+    if act[peak_i] != act[trough_i]:
+        for idx, kind, dy in ((peak_i, "Puncak", 14), (trough_i, "Dasar", -18)):
+            when = x[idx]
+            label = f"{kind} {BULAN[when.month - 1]} {when.year}"
+            ax.annotate(
+                label, (when, act[idx]), xytext=(0, dy), textcoords="offset points",
+                ha="center", va="bottom" if dy > 0 else "top", fontsize=8, color=BRAND_DARK,
+                fontweight="bold", zorder=6, clip_on=False,
+                bbox={"boxstyle": "round,pad=0.2", "fc": "white", "ec": "#E0E0E0", "lw": 0.6},
+            )
 
     for side in ("top", "right", "left"):
         ax.spines[side].set_visible(False)
@@ -1384,8 +1469,8 @@ def make_chart(ev, now):
     fig.text(0.06, 0.87, ev["title"], fontsize=13, fontweight="bold", color=BRAND_DARK)
     fig.text(0.06, 0.82, f"{ev.get('country')} · {len(pts)} rilis terakhir · sumber: TradingView",
              fontsize=8.5, color="#777777")
-    ax.legend(loc="upper left", frameon=False, fontsize=9, labelcolor=BRAND_DARK)
-    fig.subplots_adjust(left=0.09, right=0.96, top=0.76, bottom=0.11)
+    ax.legend(loc="upper right", frameon=False, fontsize=9, labelcolor=BRAND_DARK)
+    fig.subplots_adjust(left=0.09, right=0.96, top=0.74, bottom=0.14)
     buf = _io.BytesIO()
     fig.savefig(buf, format="png")
     plt.close(fig)
@@ -1407,11 +1492,11 @@ def release_embed(ev, events, now):
         "description": _clip(read["ringkasan"], 1500),
         "fields": [
             {"name": "Actual", "value": f"**{fmt_val(ev, 'actual')}**", "inline": True},
-            {"name": "Forecast/Konsensus", "value": fmt_val(ev, "forecast"), "inline": True},
+            {"name": "Forecast", "value": fmt_val(ev, "forecast"), "inline": True},
             {"name": "Previous", "value": fmt_val(ev, "previous"), "inline": True},
             {"name": "Selisih", "value": surp, "inline": True},
-            {"name": "Dampak ke RI", "value": level, "inline": True},
-            {"name": "Rilis", "value": fmt_wib(parse_dt(ev["date"])), "inline": True},
+            {"name": "Dampak", "value": level, "inline": True},
+            {"name": "Rilis", "value": _short_wib(parse_dt(ev["date"])), "inline": True},
             {"name": "Next update", "value": nxt, "inline": False},
             *_market_fields(read),
         ],
