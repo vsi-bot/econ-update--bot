@@ -1,0 +1,15 @@
+name: One Discord send
+
+# Sudah terkirim sekali (HTTP 200). Tidak ada trigger push, supaya tidak dobel.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "satu kiriman sudah selesai"
