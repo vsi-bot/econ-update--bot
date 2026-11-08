@@ -310,124 +310,14 @@ def _everyday(f):
     return f"{phrase}."
 
 
-def _today_limit(f):
-    """Dua kalimat: apa yang biasanya terjadi hari ini, dan apa yang belum diputuskan."""
-    origin, family, kind = f["origin"], f["family"], f["kind"]
-    actor, place = f["actor"], f["place"]
-    if kind == "unknown":
-        return ("Hari ini rupiah tidak dapat arah baru.",
-                "BI dan The Fed tidak mengubah bunga sebelum ada angka pembanding.")
-    if kind == "inline":
-        return ("Hari ini tidak ada kejutan, jadi rupiah tidak dapat dorongan baru.",
-                "Bunga tidak berubah hanya karena angkanya sesuai perkiraan.")
-    up = kind == "hot"
-    if origin == "US" and family in ("prices", "labor", "rate", "guidance"):
-        today = ("Hari ini dolar biasanya menguat, jadi rupiah bisa melemah." if up else
-                 "Hari ini dolar biasanya melemah, jadi rupiah bisa sedikit naik.")
-        limit = ("The Fed dan BI tidak mengubah bunga hanya karena satu laporan." if up else
-                 "Bunga baru diturunkan jika angka seperti ini berulang, bukan karena satu kali.")
-        return today, limit
-    if origin == "US" and family == "activity":
-        return (("Hari ini dolar bisa menguat sebentar, dan rupiah ikut tertekan." if up else
-                 "Hari ini dolar bisa sedikit melemah, dan rupiah bisa sedikit lega."),
-                "Satu survei belum membuat The Fed atau BI mengubah bunga.")
-    if origin == "US" and family == "growth":
-        return (("Hari ini rupiah biasanya ikut dolar, yang bisa tetap kuat." if up else
-                 "Hari ini orang lebih hati-hati, dan rupiah bisa melemah dulu."),
-                ("Ekonomi yang lebih kuat bagus untuk bisnis, tapi The Fed kurang alasan menurunkan bunga." if up else
-                 "Kalau ekonomi AS memang melambat, The Fed baru punya alasan menurunkan bunga."))
-    if origin == "US" and family == "trade":
-        return ("Efeknya ke rupiah kecil pada hari ini.",
-                "The Fed tidak mengubah bunga karena neraca dagang.")
-    if origin == "US" and family == "reserves":
-        return ("Cadangan devisa AS tidak menggerakkan rupiah hari ini.",
-                "The Fed tidak memakai angka cadangan untuk menentukan bunga.")
-    if origin == "ID" and family == "rate":
-        return (("Bunga lebih tinggi menahan rupiah hari ini, tapi pinjaman jadi lebih mahal." if up else
-                 "Bunga lebih rendah membuat pinjaman lebih murah, tapi rupiah bisa melemah."),
-                "The Fed tidak ikut berubah. Yang berubah ada di Indonesia.")
-    if origin == "ID" and family == "prices":
-        return (("Orang mengira BI akan menahan bunga. Harga surat utang bisa turun hari ini." if up else
-                 "Orang mengira BI bisa menurunkan bunga. Harga surat utang bisa naik hari ini."),
-                ("Daya beli menyempit selama harga tetap naik cepat." if up else
-                 "Itu baru terjadi jika harga yang tenang ini bukan cuma sekali."))
-    if origin == "ID" and family == "labor":
-        return (("Lebih banyak orang kerja menopang belanja di dalam negeri. Rupiah tidak otomatis menguat." if up else
-                 "Lebih susah dapat kerja menekan belanja di dalam negeri. Rupiah bisa ikut lemah."),
-                ("BI kurang alasan menurunkan bunga jika lowongan tetap banyak." if up else
-                 "BI baru menurunkan bunga jika ini berulang, dan tetap menjaga rupiah."))
-    if origin == "ID" and family == "growth":
-        return (("Ekonomi yang lebih kuat menolong saham Indonesia dan kepercayaan ke rupiah hari ini." if up else
-                 "Ekonomi yang lebih pelan menekan saham Indonesia, dan rupiah jadi lebih rentan hari ini."),
-                ("BI kurang terdesak menurunkan bunga jika ekonomi sudah kuat." if up else
-                 "Dorongan agar BI menurunkan bunga naik, tapi penurunan yang terlalu besar bisa menekan rupiah lagi."))
-    if origin == "ID" and family == "activity":
-        return ("Ini cuma survei satu bulan. BI tidak mengubah bunga hari ini.",
-                "BI baru mengubah bunga jika survei yang searah ini berulang beberapa bulan.")
-    if origin == "ID" and family == "trade":
-        return (("Uang dari luar lebih banyak masuk, jadi rupiah dapat dukungan hari ini." if up else
-                 "Uang dari luar lebih sedikit masuk, jadi rupiah lebih rentan hari ini."),
-                "BI tidak otomatis mengubah bunga. Angka ini tidak membedakan harga barang ekspor dan jumlah barang.")
-    if origin == "ID" and family == "reserves":
-        return (("BI punya lebih banyak dolar untuk menjaga rupiah. Ini bukan tanda ekonomi tumbuh." if up else
-                 "Cadangan yang turun sering berarti BI sedang menahan rupiah, atau ada uang yang keluar."),
-                ("Cadangan yang lebih tebal membuat BI lebih mampu menahan gejolak." if up else
-                 "Kalau cadangan terus turun, BI lebih sulit menjaga rupiah tanpa menaikkan bunga."))
-    if origin == "ID" and family == "guidance":
-        return (("BI terdengar lebih condong menahan bunga tinggi. Rupiah dapat dukungan hari ini." if up else
-                 "BI terdengar lebih condong menurunkan bunga. Rupiah bisa melemah hari ini."),
-                "Bunga baru benar-benar berubah jika keputusan berikutnya mengikuti kata-kata ini.")
-    if origin == "CN" and family in ("growth", "activity"):
-        return (("China yang lebih kuat biasanya mengangkat harga batu bara, nikel, dan sawit." if up else
-                 "China yang lebih pelan biasanya menekan harga batu bara, nikel, dan sawit."),
-                "BI tidak mengubah bunga karena data China. Ekspor baru benar-benar berubah jika ini bertahan.")
-    if origin == "CN" and family == "rate":
-        return (("Bunga China yang lebih tinggi mengurangi harapan bantuan pemerintah di sana." if up else
-                 "Bunga China yang lebih rendah memunculkan harapan permintaan, belum berarti barangnya sudah terbeli."),
-                "Ekspor Indonesia baru ikut berubah jika pabrik dan impor China benar-benar bergerak setelah ini.")
-    if origin == "CN" and family == "trade":
-        return (("China mungkin membeli lebih sedikit dari luar. Itu kurang baik untuk batu bara, nikel, dan sawit." if up else
-                 "China mungkin membeli lebih banyak dari luar, dan itu baik untuk barang ekspor Indonesia. Bisa juga ekspor China yang melemah."),
-                "Angka ini tidak memisahkan keduanya. Efeknya baru jelas setelah beberapa bulan.")
-    if origin == "CN":
-        return ("Efek ke Indonesia, kalau ada, lewat permintaan China, bukan lewat keputusan BI hari ini.",
-                "The Fed tidak mengubah bunga karena data China.")
-    if origin == "JP" and family == "rate":
-        return (("Yen bisa menguat, dan orang yang minjam yen murah bisa menjual asetnya. Saham Indonesia bisa turun hari ini." if up else
-                 "Yen bisa melemah, dan pinjaman yen murah bisa hidup lagi. Saham Indonesia bisa dapat dukungan hari ini."),
-                ("BI tidak mengubah bunga karena Jepang. Efeknya baru besar jika Jepang terus menaikkan bunga." if up else
-                 "Dukungan itu hilang jika yen terlalu lemah dan Jepang terpaksa menaikkan bunga lagi."))
-    if origin == "EU" and family == "rate":
-        return (("Bunga Eropa yang lebih tinggi mengangkat euro. Rupiah hanya kena sedikit." if up else
-                 "Bunga Eropa yang lebih rendah menekan euro. Rupiah dapat ruang tipis, bukan karena BI."),
-                "BI tetap lebih mengikuti The Fed daripada bank sentral Eropa.")
-    if family in ("prices", "labor", "rate", "guidance"):
-        return ((f"Bunga di {place} yang lebih tinggi bisa menekan rupiah sedikit hari ini." if up else
-                 f"Bunga di {place} yang lebih rendah bisa memberi rupiah ruang tipis hari ini."),
-                f"Efeknya lebih kecil daripada data AS, karena yang mengubah dolar besar adalah The Fed, bukan {actor}.")
-    if family in ("growth", "activity"):
-        return (f"Efek ke rupiah kecil pada hari ini.",
-                f"BI tidak mengubah bunga karena permintaan di {place}.")
-    return (f"Efek ke rupiah kecil pada hari rilis.",
-            f"Satu angka dari {place} belum mengubah bunga BI atau The Fed.")
-
-
 def rule_analysis(ev):
+    """Fakta sekali. Akibatnya ada di enam baris pasar, bukan di sini."""
     f = _facts(ev)
-    today, limit = _today_limit(f)
-    parts = [
-        _everyday(f),
-        f"{f['title']} {f['place']} {f['actual']} ({f['paren']}).",
-    ]
+    parts = [_everyday(f), f"{f['title']} {f['place']} {f['actual']} ({f['paren']})."]
     note = _note(f["title"])
     if note:
         parts.append(note)
-    parts.extend((today, limit))
-    return _clip(" ".join(parts), 900)
-
-
-def _say(f, text):
-    return f"{f['title']} {f['place']}: {text}"
+    return _clip(" ".join(parts), 500)
 
 
 def _pack(id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang):
@@ -437,348 +327,210 @@ def _pack(id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_pa
     }
 
 
+def _quiet():
+    """Enam pasar yang tidak bergerak, satu klausa datar tiap baris."""
+    return _pack(
+        "Rupiah tidak bergerak.",
+        "Bunga BI tidak bergerak.",
+        "Saham AS tidak bergerak.",
+        "Bunga The Fed tidak bergerak.",
+        "Dolar tidak bergerak.",
+        "Harga barang antarnegara tidak bergerak.",
+    )
+
+
 def _market_lines(f):
-    phrase = _dir_phrase(f)
     origin, family, kind = f["origin"], f["family"], f["kind"]
-    actor, place = f["actor"], f["place"]
-    if kind == "unknown":
-        return _pack(
-            _say(f, "belum ada perkiraan, jadi rupiah tidak dapat arah baru hari ini."),
-            _say(f, "BI tidak mengubah bunga sebelum ada angka pembanding."),
-            _say(f, "pasar AS tidak mengubah harga selama kejutannya belum terukur."),
-            _say(f, "The Fed juga belum dapat arah baru."),
-            _say(f, "pasar dunia tidak bergerak besar tanpa kejutan yang jelas."),
-            _say(f, "satu angka tanpa pembanding belum mengubah apa-apa."),
-        )
-    if kind == "inline":
-        return _pack(
-            _say(f, "pas dengan perkiraan, jadi rupiah tidak dapat dorongan baru hari ini."),
-            _say(f, "bunga tidak berubah hanya karena angkanya sesuai."),
-            _say(f, "sudah diduga, jadi saham dan surat utang AS tidak perlu diubah hari ini."),
-            _say(f, "The Fed tidak dapat alasan baru untuk mengubah bunga."),
-            _say(f, "tidak menggerakkan dolar hari ini."),
-            _say(f, "yang tetap berlaku adalah angkanya sendiri, bukan kejutan."),
-        )
+    if kind in ("unknown", "inline"):
+        return _quiet()
     up = kind == "hot"
     if origin == "US" and family == "labor":
         return _pack(
-            _say(f, f"{phrase}. Dolar biasanya {'naik' if up else 'turun'} hari ini, jadi rupiah bisa {'melemah' if up else 'sedikit naik'}."),
-            _say(f, "BI tidak mengubah bunga karena satu laporan kerja AS." if up else
-                  "BI baru punya alasan menurunkan bunga jika laporan kerja AS yang lemah ini berulang."),
-            _say(f, f"{phrase}. Bunga pinjaman jangka pendek AS bisa {'naik' if up else 'turun'} hari ini."),
-            _say(f, "The Fed tidak menaikkan bunga hanya karena satu bulan orang lebih mudah dapat kerja." if up else
-                  "The Fed baru mempertimbangkan bunga lebih rendah jika orang makin susah dapat kerja beberapa bulan."),
-            _say(f, f"{phrase}. Dolar biasanya {'menguat' if up else 'melemah'} terhadap mata uang lain hari ini."),
-            _say(f, "Perdagangan dunia tidak berubah dari satu laporan kerja." if up else
-                  "Satu laporan yang lemah belum berarti ekonomi dunia melambat."),
+            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
+            "BI menahan bunga." if up else "BI menurunkan bunga.",
+            "Bunga pinjaman jangka pendek AS naik hari ini." if up else "Bunga pinjaman jangka pendek AS turun hari ini.",
+            "The Fed menahan bunga." if up else "The Fed menurunkan bunga.",
+            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
+            "Harga barang antarnegara tidak bergerak.",
         )
     if origin == "US" and family == "prices":
         return _pack(
-            _say(f, f"{phrase}. Dolar biasanya {'naik' if up else 'turun'} hari ini, jadi rupiah bisa {'melemah' if up else 'sedikit naik'}."),
-            _say(f, "BI kehilangan ruang menurunkan bunga selama harga di AS tetap naik cepat." if up else
-                  "BI dapat ruang menurunkan bunga jika harga di AS terus lebih tenang."),
-            _say(f, f"bunga pinjaman jangka pendek AS bisa {'naik' if up else 'turun'} hari ini. Saham yang sensitif bunga paling terasa."),
-            _say(f, "The Fed lebih sulit menurunkan bunga selama harga belum mendingin." if up else
-                  "The Fed baru menurunkan bunga jika harga yang lebih tenang ini bertahan, bukan karena satu bulan."),
-            _say(f, f"dolar biasanya {'menguat' if up else 'melemah'} hari ini."),
-            _say(f, "kalau harga AS tetap naik cepat, orang lebih suka menaruh uang di aset dolar." if up else
-                  "kalau harga AS terus mendingin, biaya pinjaman di luar AS bisa ikut lebih murah."),
+            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
+            "BI menahan bunga." if up else "BI menurunkan bunga.",
+            "Bunga pinjaman jangka pendek AS naik hari ini." if up else "Bunga pinjaman jangka pendek AS turun hari ini.",
+            "The Fed menahan bunga." if up else "The Fed menurunkan bunga.",
+            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
+            "Harga barang di luar AS naik." if up else "Harga barang di luar AS turun.",
         )
     if origin == "US" and family == "rate":
         return _pack(
-            _say(f, f"{phrase}. Rupiah {'tertekan' if up else 'bisa sedikit lega'} hari ini karena dolar {'menguat' if up else 'melemah'}."),
-            _say(f, "BI sulit menurunkan bunga lebih dulu tanpa menekan rupiah." if up else
-                  "BI dapat ruang menurunkan bunga, selama rupiah tidak melemah karena hal lain."),
-            _say(f, "bunga pinjaman jangka pendek AS langsung berubah pada hari keputusan."),
-            _say(f, "ini perubahan harga uang sekarang, bukan angka yang masih menunggu perbaikan data."),
-            _say(f, f"dolar {'menguat' if up else 'melemah'} dan pinjaman global jadi {'lebih mahal' if up else 'lebih murah'} hari ini."),
-            _say(f, "efeknya bertahan jika The Fed tidak membatalkan keputusan ini pada rapat berikut."),
+            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
+            "BI menahan bunga." if up else "BI menurunkan bunga.",
+            "Bunga pinjaman AS naik hari ini." if up else "Bunga pinjaman AS turun hari ini.",
+            "Tagihan utang AS tetap lebih mahal." if up else "Tagihan utang AS jadi lebih murah.",
+            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
+            "Pinjaman di luar AS jadi lebih mahal." if up else "Pinjaman di luar AS jadi lebih murah.",
         )
     if origin == "US" and family == "guidance":
         return _pack(
-            _say(f, f"{phrase}. Dolar bisa {'naik' if up else 'turun'} hari ini, dan rupiah ikut."),
-            _say(f, "BI tidak mengubah bunga hanya karena kata-kata The Fed. Data harga dan kerja berikutnya yang menentukan."),
-            _say(f, "bunga pinjaman jangka pendek AS bisa bergerak hari ini karena kalimat itu."),
-            _say(f, "satu pernyataan belum mengubah bunga. Angka harga dan lapangan kerja tetap yang menguji."),
-            _say(f, f"dolar bisa {'menguat' if up else 'melemah'} hari ini karena orang membaca nada The Fed."),
-            _say(f, "pasar dunia baru menganggapnya serius jika The Fed mengulanginya, bukan dari satu teks."),
+            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
+            "Bunga BI tidak bergerak.",
+            "Bunga pinjaman jangka pendek AS naik hari ini." if up else "Bunga pinjaman jangka pendek AS turun hari ini.",
+            "Bunga The Fed tidak bergerak.",
+            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
+            "Harga barang antarnegara tidak bergerak.",
         )
     if origin == "US" and family == "growth":
         return _pack(
-            _say(f, f"{phrase}. Rupiah hari ini biasanya ikut dolar, yang bisa {'tetap kuat' if up else 'melemah'}."),
-            _say(f, "ekspor Indonesia ke AS lebih tertolong, tapi biaya pinjaman global tidak cepat turun." if up else
-                  "pasar ekspor ke AS menyusut, sementara ruang BI menurunkan bunga baru terbuka kalau dolar benar-benar turun."),
-            _say(f, "saham bisnis harian AS dapat dukungan, sementara bunga jangka pendek bisa naik." if up else
-                  "saham bisnis harian AS kehilangan dukungan, sementara bunga jangka pendek bisa turun."),
-            _say(f, "satu kuartal masih bisa diperbaiki. The Fed kurang alasan menurunkan bunga jika pertumbuhan bertahan." if up else
-                  "kalau ini berlanjut, ekonomi lebih pelan dan bunga bisa lebih rendah. Keduanya perlu kuartal berikutnya."),
-            _say(f, "minat beli di pasar dunia naik, tapi dolar tidak otomatis melemah." if up else
-                  "minat beli di pasar dunia turun pada hari rilis."),
-            _say(f, "perdagangan dunia lebih tertolong oleh permintaan AS yang kuat." if up else
-                  "perdagangan dunia kehilangan permintaan AS. Bunga The Fed yang lebih rendah, kalau ada, baru terasa belakangan."),
+            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
+            "BI menahan bunga." if up else "BI menurunkan bunga.",
+            "Saham perusahaan AS naik hari ini." if up else "Saham perusahaan AS turun hari ini.",
+            "The Fed menahan bunga." if up else "The Fed menurunkan bunga.",
+            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
+            "Pesanan barang dari AS bertambah." if up else "Pesanan barang dari AS berkurang.",
         )
     if origin == "US" and family == "activity":
         return _pack(
-            _say(f, f"{phrase}. Ini satu bulan, bukan ukuran ekonomi setahun. Rupiah bisa {'tertekan' if up else 'sedikit lega'} hari ini."),
-            _say(f, "The Fed dan BI baru mengubah bunga jika survei yang searah ini bertahan beberapa bulan."),
-            _say(f, "saham bisnis harian AS bisa bergerak hari ini, lalu mudah balik bulan depan."),
-            _say(f, "The Fed tidak mengubah bunga karena satu bulan. Yang dilihat adalah harga dan lapangan kerja."),
-            _say(f, "pasar dunia bergerak tipis. Ini bukan keputusan bunga."),
-            _say(f, "perdagangan dunia tidak berubah sebelum angka ini terlihat di pertumbuhan dan harga."),
+            "Rupiah melemah hari ini." if up else "Rupiah menguat hari ini.",
+            "Bunga BI tidak bergerak.",
+            "Saham perusahaan AS naik hari ini." if up else "Saham perusahaan AS turun hari ini.",
+            "Bunga The Fed tidak bergerak.",
+            "Dolar menguat hari ini." if up else "Dolar melemah hari ini.",
+            "Harga barang antarnegara tidak bergerak.",
         )
     if origin == "US" and family == "trade":
-        return _pack(
-            _say(f, f"{phrase}. Efeknya ke rupiah kecil."),
-            _say(f, "neraca dagang AS tidak mengubah ruang BI."),
-            _say(f, "The Fed tidak mengubah bunga karena neraca dagang. Saham dan surat utang AS tidak punya alasan besar untuk berubah."),
-            _say(f, "angka ini mencerminkan perdagangan yang sudah terjadi, bukan keputusan bunga yang baru."),
-            _say(f, "arus dagang tidak berbalik pada hari rilis."),
-            _say(f, "angka ini tidak memberitahu apakah yang berubah harga barang atau jumlah barang."),
-        )
+        lines = _quiet()
+        lines["global_pendek"] = "Dolar menguat hari ini." if up else "Dolar melemah hari ini."
+        return lines
     if origin == "US" and family == "reserves":
-        return _pack(
-            _say(f, "cadangan devisa AS tidak menggerakkan rupiah hari ini."),
-            _say(f, "angka ini tidak mengubah ruang BI dan bukan permintaan untuk ekspor Indonesia."),
-            _say(f, "bunga AS tidak berubah karena cadangan devisa."),
-            _say(f, "The Fed tidak memakai angka cadangan untuk menentukan bunga."),
-            _say(f, "dolar tidak berbalik karena perubahan cadangan AS."),
-            _say(f, "uang beredar di dunia tidak berubah hanya karena satu catatan cadangan."),
-        )
+        return _quiet()
     if origin == "ID":
-        return _id_lines(f, phrase, up)
+        return _id_lines(f, up)
     if origin == "CN":
-        return _cn_lines(f, phrase, up)
+        return _cn_lines(f, up)
     if origin == "JP" and family == "rate":
         return _pack(
-            _say(f, f"{phrase}. Yen bisa {'menguat' if up else 'melemah'}, dan saham Indonesia bisa {'turun' if up else 'dapat dukungan'} hari ini."),
-            _say(f, "BI tidak mengubah bunga karena Jepang." if up else
-                  "dukungan itu hilang jika yen terlalu lemah dan Jepang terpaksa menaikkan bunga lagi."),
-            _say(f, "The Fed tidak ikut mengubah bunga. Surat utang AS paling kena lewat orang yang menutup pinjaman yen."),
-            _say(f, "efek ke AS kecil. Yang panjang adalah apakah pinjaman yen murah terus menyempit." if up else
-                  "jalur bunga AS tidak mengikuti Jepang."),
-            _say(f, f"yen {'menguat' if up else 'melemah'} pada hari keputusan."),
-            _say(f, "efeknya baru besar jika Jepang mengulang keputusan ini, bukan pada satu rapat."),
+            "Saham Indonesia turun hari ini." if up else "Saham Indonesia naik hari ini.",
+            "Bunga BI tidak bergerak.",
+            "Saham AS turun hari ini." if up else "Saham AS naik hari ini.",
+            "Bunga The Fed tidak bergerak.",
+            "Yen menguat hari ini." if up else "Yen melemah hari ini.",
+            "Pinjaman dalam yen jadi lebih mahal." if up else "Pinjaman dalam yen jadi lebih murah.",
         )
     if origin == "EU" and family == "rate":
         return _pack(
-            _say(f, f"{phrase}. Rupiah hanya kena sedikit, jauh lebih kecil daripada keputusan The Fed."),
-            _say(f, "BI tetap lebih mengikuti The Fed daripada bank sentral Eropa."),
-            _say(f, "The Fed tidak mengubah bunga hanya karena Eropa."),
-            _say(f, "yang terasa di AS cuma bunga surat utang yang bergerak bareng, dan itu kecil."),
-            _say(f, f"euro {'menguat' if up else 'melemah'} pada hari keputusan."),
-            _say(f, "ini belum berarti bunga di seluruh negara maju bergerak bareng, selama The Fed belum ikut."),
+            "Rupiah tidak bergerak.",
+            "Bunga BI tidak bergerak.",
+            "Saham AS tidak bergerak.",
+            "Bunga The Fed tidak bergerak.",
+            "Euro menguat hari ini." if up else "Euro melemah hari ini.",
+            "Bunga pinjaman di Eropa naik." if up else "Bunga pinjaman di Eropa turun.",
         )
-    return _other_lines(f, phrase, up)
+    return _other_lines(f, up)
 
 
-def _id_lines(f, phrase, up):
+def _id_lines(f, up):
     family = f["family"]
+    lines = _quiet()
     if family == "rate":
-        return _pack(
-            _say(f, f"{phrase}. Rupiah {'dapat dukungan' if up else 'bisa melemah'} hari ini, dan pinjaman jadi {'lebih mahal' if up else 'lebih murah'}."),
-            _say(f, "kredit lebih berat selama bunga tetap tinggi." if up else
-                  "BI tidak bisa menurunkan bunga jauh di bawah The Fed tanpa menekan rupiah."),
-            _say(f, "pasar AS tidak mengubah bunga karena keputusan BI."),
-            _say(f, "The Fed tidak memakai angka Indonesia."),
-            _say(f, "mata uang lain tidak otomatis ikut."),
-            _say(f, "efeknya ada di Indonesia, bukan di dolar dunia."),
-        )
-    if family == "prices":
-        return _pack(
-            _say(f, f"{phrase}. Harga surat utang Indonesia bisa {'turun' if up else 'naik'} hari ini."),
-            _say(f, "daya beli menyempit selama harga tetap naik cepat." if up else
-                  "ruang BI menurunkan bunga melebar jika ini bukan cuma sekali."),
-            _say(f, "harga Indonesia tidak mengubah bunga The Fed."),
-            _say(f, "pasar AS tidak merevisi bunga karena inflasi Indonesia."),
-            _say(f, "harga dunia tidak berpindah karena angka ini."),
-            _say(f, "ini cerita dalam negeri, bukan harga barang dunia."),
-        )
-    if family == "labor":
-        return _pack(
-            _say(f, f"{phrase}. Belanja di dalam negeri {'lebih tertolong' if up else 'bisa melemah'}."),
-            _say(f, "BI kurang alasan menurunkan bunga jika lowongan tetap banyak." if up else
-                  "BI baru menurunkan bunga jika ini berulang, dan tetap menjaga rupiah."),
-            _say(f, "lapangan kerja Indonesia tidak mengubah laporan kerja AS."),
-            _say(f, "The Fed tidak memakai angka ini."),
-            _say(f, "dolar tidak berbalik karena pengangguran Indonesia."),
-            _say(f, "yang berubah adalah belanja di dalam negeri, bukan perdagangan dunia."),
-        )
-    if family == "growth":
-        return _pack(
-            _say(f, f"{phrase}. Saham Indonesia dan rupiah {'dapat dukungan' if up else 'lebih rentan'} hari ini."),
-            _say(f, "BI kurang terdesak menurunkan bunga jika ekonomi sudah kuat." if up else
-                  "dorongan agar BI menurunkan bunga naik, tapi penurunan yang terlalu besar bisa menekan rupiah lagi."),
-            _say(f, "pertumbuhan Indonesia tidak mengubah saham atau surat utang AS hari ini."),
-            _say(f, "The Fed tidak merevisi bunga karena GDP Indonesia."),
-            _say(f, "pasar dunia hampir tidak bergerak."),
-            _say(f, "kontribusinya ke perdagangan dunia baru terasa jika ini bertahan beberapa kuartal."),
-        )
-    if family == "activity":
-        return _pack(
-            _say(f, f"{phrase}. Ini satu bulan, bukan ukuran ekonomi setahun. BI tidak mengubah bunga hari ini."),
-            _say(f, "BI baru mengubah bunga jika survei yang searah ini berulang."),
-            _say(f, "survei Indonesia tidak masuk harga bunga AS."),
-            _say(f, "The Fed tidak memakai survei ini."),
-            _say(f, "satu survei Indonesia tidak menggerakkan harga dunia."),
-            _say(f, "baru berarti di luar negeri jika kemudian terlihat di pertumbuhan dan impor."),
-        )
-    if family == "trade":
-        return _pack(
-            _say(f, f"{phrase}. Rupiah {'dapat dukungan' if up else 'lebih rentan'} hari ini."),
-            _say(f, "BI tidak otomatis mengubah bunga. Angka ini tidak membedakan harga dan jumlah barang."),
-            _say(f, "neraca dagang Indonesia tidak mengubah The Fed."),
-            _say(f, "pasar AS tidak merevisi bunga karena angka ini."),
-            _say(f, "harga batu bara, nikel, dan sawit tidak ditentukan oleh satu neraca Indonesia."),
-            _say(f, "kalau yang berubah cuma harga barang ekspor, bukan jumlah barang, itu tidak tertulis di angka ini."),
-        )
-    if family == "reserves":
-        return _pack(
-            _say(f, f"{phrase}. {'BI lebih mampu menjaga rupiah.' if up else 'BI sedang menahan rupiah, atau ada uang yang keluar.'}"),
-            _say(f, "ini simpanan dolar, bukan tanda ekonomi tumbuh." if up else
-                  "kalau cadangan terus turun, BI lebih sulit menjaga rupiah tanpa menaikkan bunga."),
-            _say(f, "cadangan Indonesia tidak mengubah The Fed."),
-            _say(f, "pasar AS tidak merevisi bunga karena angka ini."),
-            _say(f, "pasar dunia tidak diubah. Yang berubah adalah kemampuan BI menjaga rupiah."),
-            _say(f, "dolar dunia tidak berbalik karena cadangan Indonesia."),
-        )
-    if family == "guidance":
-        return _pack(
-            _say(f, f"{phrase}. Rupiah {'dapat dukungan' if up else 'bisa melemah'} hari ini."),
-            _say(f, "bunga baru benar-benar berubah jika keputusan berikutnya mengikuti kata-kata ini."),
-            _say(f, "kata-kata BI tidak mengubah bunga The Fed."),
-            _say(f, "pasar AS tidak merevisi bunga karena pernyataan BI."),
-            _say(f, "dolar dunia tidak berbalik karena nada BI."),
-            _say(f, "satu pernyataan dalam negeri tidak mengubah pinjaman dunia."),
-        )
-    return _pack(
-        _say(f, f"{phrase}. Efek utamanya di Indonesia, lewat BI dan rupiah."),
-        _say(f, "BI baru mengubah bunga jika pola ini bertahan, bukan karena satu rilis."),
-        _say(f, "pasar AS tidak mengubah bunga karena data Indonesia."),
-        _say(f, "The Fed tidak memakai angka ini."),
-        _say(f, "dolar dunia tidak berbalik karena rilis Indonesia."),
-        _say(f, "perdagangan dunia tidak ditentukan oleh satu data Indonesia."),
-    )
+        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
+        lines["id_panjang"] = "Bunga pinjaman di Indonesia naik." if up else "Bunga pinjaman di Indonesia turun."
+    elif family == "prices":
+        lines["id_pendek"] = "Harga barang di Indonesia naik." if up else "Harga barang di Indonesia turun."
+        lines["id_panjang"] = "BI menahan bunga." if up else "BI menurunkan bunga."
+    elif family == "labor":
+        lines["id_pendek"] = "Saham perusahaan Indonesia naik hari ini." if up else "Saham perusahaan Indonesia turun hari ini."
+        lines["id_panjang"] = "BI menahan bunga." if up else "BI menurunkan bunga."
+    elif family == "growth":
+        lines["id_pendek"] = "Saham Indonesia naik hari ini." if up else "Saham Indonesia turun hari ini."
+        lines["id_panjang"] = "BI menahan bunga." if up else "BI menurunkan bunga."
+    elif family == "activity":
+        lines["id_pendek"] = "Saham Indonesia naik hari ini." if up else "Saham Indonesia turun hari ini."
+    elif family == "trade":
+        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
+    elif family == "reserves":
+        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
+        if not up:
+            lines["id_panjang"] = "BI menahan bunga."
+    elif family == "guidance":
+        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
+        lines["id_panjang"] = "BI menahan bunga." if up else "BI menurunkan bunga."
+    else:
+        lines["id_pendek"] = "Rupiah menguat hari ini." if up else "Rupiah melemah hari ini."
+    return lines
 
 
-def _cn_lines(f, phrase, up):
+def _cn_lines(f, up):
     family = f["family"]
     if family in ("growth", "activity"):
         return _pack(
-            _say(f, f"{phrase}. Harga batu bara, nikel, dan sawit biasanya {'naik' if up else 'turun'}."),
-            _say(f, "BI tidak mengubah bunga. Ekspor Indonesia baru benar-benar berubah jika permintaan China bertahan."),
-            _say(f, "saham AS yang jual ke Asia bisa bergerak tipis. Bunga The Fed tidak berubah."),
-            _say(f, "The Fed tidak mengubah bunga karena China."),
-            _say(f, f"harga logam dan energi {'dapat dukungan' if up else 'kehilangan dukungan'} hari ini."),
-            _say(f, "pabrik dunia baru benar-benar terasa efeknya jika data China yang searah ini berulang."),
+            "Harga batu bara, nikel, dan sawit naik hari ini." if up else "Harga batu bara, nikel, dan sawit turun hari ini.",
+            "Ekspor Indonesia ke China bertambah." if up else "Ekspor Indonesia ke China berkurang.",
+            "Saham AS tidak bergerak.",
+            "Bunga The Fed tidak bergerak.",
+            "Harga logam naik hari ini." if up else "Harga logam turun hari ini.",
+            "Pesanan pabrik di luar China bertambah." if up else "Pesanan pabrik di luar China berkurang.",
         )
     if family == "rate":
         return _pack(
-            _say(f, f"{phrase}. Harapan permintaan barang ekspor Indonesia {'meredup' if up else 'naik'}, belum berarti barangnya sudah terbeli."),
-            _say(f, "ekspor Indonesia baru ikut jika pabrik dan impor China benar-benar bergerak setelah ini."),
-            _say(f, "The Fed tidak ikut mengubah bunga."),
-            _say(f, "bunga AS tidak mengikuti bank sentral China."),
-            _say(f, f"logam dan energi {'kehilangan' if up else 'mendapat'} dukungan hari ini."),
-            _say(f, "satu keputusan belum mengubah perdagangan barang dunia."),
+            "Harga batu bara, nikel, dan sawit turun hari ini." if up else "Harga batu bara, nikel, dan sawit naik hari ini.",
+            "Ekspor Indonesia ke China berkurang." if up else "Ekspor Indonesia ke China bertambah.",
+            "Saham AS tidak bergerak.",
+            "Bunga The Fed tidak bergerak.",
+            "Harga logam turun hari ini." if up else "Harga logam naik hari ini.",
+            "Pinjaman di China jadi lebih mahal." if up else "Pinjaman di China jadi lebih murah.",
         )
     if family == "prices":
         return _pack(
-            _say(f, f"{phrase}. Bank sentral China {'lebih hati-hati memberi bantuan' if up else 'punya ruang memberi bantuan'}."),
-            _say(f, "ekspor Indonesia baru tertolong jika pabrik di China benar-benar lebih ramai."),
-            _say(f, "harga China bukan alasan The Fed mengubah bunga."),
-            _say(f, "pasar AS tidak merevisi bunga karena angka ini."),
-            _say(f, "bantuan pemerintah China jadi kurang pasti hari ini." if up else
-                  "harapan permintaan barang dunia, terutama logam dan energi, naik tipis."),
-            _say(f, "efek ke harga barang negara lain baru terasa belakangan, kalau pola ini bertahan."),
-        )
-    if family == "trade":
-        return _pack(
-            _say(f, f"{phrase}. {'China mungkin membeli lebih sedikit dari luar, dan itu kurang baik untuk barang ekspor Indonesia.' if up else 'China mungkin membeli lebih banyak, dan itu baik untuk barang ekspor Indonesia. Bisa juga ekspor China yang melemah.'}"),
-            _say(f, "angka ini tidak memisahkan keduanya. Efeknya baru jelas setelah beberapa bulan."),
-            _say(f, "The Fed tidak bergerak karena neraca China."),
-            _say(f, "bunga AS tidak berubah. Efek ke harga barang impor AS, kalau ada, lambat."),
-            _say(f, "pasar barang dunia belum dapat arah yang bersih hari ini."),
-            _say(f, "pangsa dagang baru bergeser jika pola ini bertahan, bukan karena satu bulan."),
+            "Harga batu bara, nikel, dan sawit tidak bergerak." if up else "Harga batu bara, nikel, dan sawit naik hari ini.",
+            "Ekspor Indonesia ke China tidak bertambah." if up else "Ekspor Indonesia ke China bertambah.",
+            "Saham AS tidak bergerak.",
+            "Bunga The Fed tidak bergerak.",
+            "Harga barang dari China naik." if up else "Harga barang dari China turun.",
+            "Bunga di China tetap tinggi." if up else "Bunga di China turun.",
         )
     if family == "labor":
-        return _pack(
-            _say(f, f"{phrase}. Efek ke barang ekspor Indonesia lebih kecil daripada data pabrik atau pertumbuhan."),
-            _say(f, "yang panjang adalah daya beli orang China untuk barang impor."),
-            _say(f, "lapangan kerja China tidak mengubah laporan kerja AS."),
-            _say(f, "The Fed tidak memakai angka ini."),
-            _say(f, "pasar dunia bergerak kecil pada satu rilis."),
-            _say(f, "perdagangan dunia tidak berbalik karena pengangguran China semata."),
-        )
-    if family == "reserves":
-        return _pack(
-            _say(f, f"{phrase}. Ini bukan tanda China membeli lebih banyak barang ekspor."),
-            _say(f, "cadangan China tidak otomatis menambah ekspor Indonesia."),
-            _say(f, "The Fed tidak bergerak karena cadangan China."),
-            _say(f, "bunga AS tidak berubah."),
-            _say(f, "uang beredar dunia tidak berbalik karena satu catatan simpanan."),
-            _say(f, "simpanan dolar bukan pengganti permintaan impor China."),
-        )
+        lines = _quiet()
+        lines["id_panjang"] = ("Ekspor barang jadi Indonesia ke China bertambah." if up else
+                               "Ekspor barang jadi Indonesia ke China berkurang.")
+        return lines
     if family == "guidance":
         return _pack(
-            _say(f, f"{phrase}. Harga barang ekspor Indonesia bisa {'turun' if up else 'naik'} karena harapan, belum karena barang yang sudah terbeli."),
-            _say(f, "ekspor Indonesia baru berubah jika pinjaman dan impor China mengikuti kata-kata ini."),
-            _say(f, "The Fed tidak mengubah bunga karena pernyataan China."),
-            _say(f, "bunga AS tidak mengikuti nada China."),
-            _say(f, f"logam {'kehilangan' if up else 'mendapat'} dukungan harapan hari ini."),
-            _say(f, "satu pernyataan belum menjadi perubahan kebijakan yang menetap."),
+            "Harga batu bara, nikel, dan sawit turun hari ini." if up else "Harga batu bara, nikel, dan sawit naik hari ini.",
+            "Ekspor Indonesia ke China berkurang." if up else "Ekspor Indonesia ke China bertambah.",
+            "Saham AS tidak bergerak.",
+            "Bunga The Fed tidak bergerak.",
+            "Harga logam turun hari ini." if up else "Harga logam naik hari ini.",
+            "Bunga di China tidak bergerak.",
         )
-    return _pack(
-        _say(f, f"{phrase}. Efek ke Indonesia, kalau ada, lewat permintaan China, bukan lewat BI."),
-        _say(f, "efeknya baru berarti jika pola ini bertahan beberapa rilis."),
-        _say(f, "The Fed tidak mengubah bunga karena data China."),
-        _say(f, "bunga AS tidak mengikuti China."),
-        _say(f, "harga dunia tidak otomatis berbalik pada satu rilis."),
-        _say(f, "perdagangan barang baru berubah jika data China yang searah berulang."),
-    )
+    return _quiet()
 
 
-def _other_lines(f, phrase, up):
-    family, place, actor = f["family"], f["place"], f["actor"]
+def _other_lines(f, up):
+    family, place = f["family"], f["place"]
+    lines = _quiet()
     if family in ("prices", "labor", "rate", "guidance"):
-        return _pack(
-            _say(f, f"{phrase}. Rupiah bisa {'tertekan' if up else 'sedikit lega'} hari ini, tapi efeknya lebih kecil daripada data AS."),
-            _say(f, f"BI tidak mengubah bunga hanya karena {actor}."),
-            _say(f, f"The Fed tidak mengubah bunga karena {actor}."),
-            _say(f, "bunga AS tetap ditentukan data AS."),
-            _say(f, f"mata uang {place} bergerak pada hari rilis."),
-            _say(f, "efeknya baru bertahan jika pola ini berulang, bukan pada satu rilis."),
-        )
-    if family in ("growth", "activity"):
-        return _pack(
-            _say(f, f"{phrase}. Efek ke rupiah kecil pada hari ini."),
-            _say(f, f"BI tidak mengubah bunga karena permintaan di {place}."),
-            _say(f, f"pertumbuhan {place} tidak mengubah bunga The Fed hari ini."),
-            _say(f, "bunga AS tetap ditentukan data AS."),
-            _say(f, "pasar dunia bergerak tipis."),
-            _say(f, f"perdagangan dunia tidak berbalik sebelum data {place} yang searah berulang."),
-        )
-    if family == "trade":
-        return _pack(
-            _say(f, f"{phrase}. Neraca {place} bukan uang yang masuk ke Indonesia, jadi rupiah hampir tidak bergerak."),
-            _say(f, "BI tidak dapat informasi baru tentang ekspor Indonesia dari neraca negara lain."),
-            _say(f, f"The Fed tidak mengubah bunga karena neraca {place}."),
-            _say(f, "bunga AS tidak mengikuti neraca negara lain."),
-            _say(f, "arus dagang tidak berbalik pada satu rilis."),
-            _say(f, "pangsa dagang baru bergeser jika pola ini bertahan beberapa bulan."),
-        )
-    return _pack(
-        _say(f, f"{phrase}. Tidak ada alasan rupiah bergerak besar hari ini."),
-        _say(f, f"BI tidak mengubah bunga karena angka {place} ini."),
-        _say(f, "pasar AS tidak diubah oleh rilis ini."),
-        _say(f, "The Fed tidak mengubah bunga."),
-        _say(f, "pasar dunia tidak mendapat arah baru."),
-        _say(f, "satu rilis tidak mengubah pinjaman dunia."),
-    )
+        lines["global_panjang"] = f"Bunga di {place} naik." if up else f"Bunga di {place} turun."
+    elif family in ("growth", "activity"):
+        lines["global_panjang"] = f"Pesanan dari {place} bertambah." if up else f"Pesanan dari {place} berkurang."
+    return lines
+
+
+def _strip_fact(f, text):
+    """Buang nama indikator kalau masih menempel di depan baris."""
+    text = " ".join((text or "").split())
+    for prefix in (f"{f['title']} {f['place']}:", f"{f['title']}:"):
+        if text.lower().startswith(prefix.lower()):
+            text = text[len(prefix):].strip()
+    if text and text[0].islower():
+        text = text[0].upper() + text[1:]
+    return text
 
 
 def market_views(ev):
     f = _facts(ev)
     lines = _market_lines(f)
-    return {k: _clip(lines.get(k), 420) for k in MARKET_KEYS}
+    return {k: _clip(_strip_fact(f, lines.get(k)), 280) for k in MARKET_KEYS}
 
 def build_macro_read(ev):
     read = market_views(ev)
@@ -837,14 +589,17 @@ def llm_analysis(ev, level, read, next_txt):
         "Kalau perlu menyebut bunga, dolar, rupiah, saham, atau harga barang, pakai kata itu saja.\n"
         "Gunakan HANYA angka yang diberikan. Jangan mengarang data lain. Jangan menyuruh beli atau jual.\n"
         "Balas HANYA JSON valid, tanpa markdown, dengan kunci:\n"
-        "ringkasan: 2 atau 3 kalimat pendek. Sebut nama indikator, angkanya, dan artinya dalam hidup sehari-hari "
-        "(lebih banyak orang dapat kerja, harga naik lebih cepat, bunga lebih tinggi, dan sejenisnya). "
-        "Sebut juga apa yang satu laporan ini belum putuskan.\n"
-        "id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang: masing-masing SATU kalimat pendek, "
-        "dan keenamnya harus berbeda. Pasar Indonesia, pasar Amerika, dan global. "
-        "Jangka pendek artinya hari rilis. Jangka panjang artinya beberapa bulan ke depan. "
-        "Tiap kalimat menyebut nama indikator dan apakah angkanya lebih kuat atau lebih lemah dari perkiraan. "
-        "Kalau efeknya kecil, katakan kecil dan kenapa.\n\n"
+        "ringkasan: fakta sekali saja. Nama indikator, angkanya, dan artinya sehari-hari "
+        "(lebih banyak orang dapat kerja, harga naik lebih cepat, bunga lebih tinggi). "
+        "Jangan tulis akibat ke rupiah, bunga, saham, atau dolar di ringkasan.\n"
+        "id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang: "
+        "masing-masing SATU kalimat, dan keenamnya harus berbeda.\n"
+        "Jangan ulang nama indikator. Jangan ulang kalimat fakta dari ringkasan. "
+        "Jangan pakai kata biasanya bersama bisa. Jangan menulis 'karena satu laporan'.\n"
+        "Tiap kalimat adalah satu akibat yang bisa dibayangkan: rupiah, bunga, saham, atau dolar. "
+        "Jangka pendek artinya hari rilis. Jangka panjang artinya beberapa bulan ke depan.\n"
+        "Kalau pasar itu tidak bergerak, tulis satu klausa datar, contoh: 'Rupiah tidak bergerak.' "
+        "Jangan menjelaskan kenapa.\n\n"
         f"Data: {json.dumps(payload, ensure_ascii=False)}\n"
         f"Kategori dampak ke Indonesia: {level}\n"
         f"Rilis berikutnya: {next_txt}\n"
