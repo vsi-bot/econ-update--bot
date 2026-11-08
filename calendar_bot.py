@@ -163,6 +163,28 @@ def surprise(ev):
     return (1 if diff > 0 else -1), diff, label
 
 
+def move_badge(ev):
+    """Panah dan persen vs basis yang sama dengan kolom Selisih.
+    Naik hijau, turun merah, datar tanpa panah. None kalau pembanding tidak ada."""
+    direction, diff, _label = surprise(ev)
+    actual = ev.get("actual")
+    base = ev.get("forecast") if ev.get("forecast") is not None else ev.get("previous")
+    if diff is None or actual is None or base is None:
+        return None
+    if direction == 0 or abs(diff) < 1e-9:
+        return {"flat": True, "up": False, "text": "0.00%", "color": "#5C6770"}
+    if abs(base) < 1e-12:
+        return None
+    pct = (actual - base) / abs(base) * 100.0
+    up = pct > 0
+    return {
+        "flat": False,
+        "up": up,
+        "text": f"{'▲' if up else '▼'} {pct:+.2f}%",
+        "color": "#14804A" if up else "#C8102E",
+    }
+
+
 # ---------------------------------------------------------------- bacaan makro
 # Rilis dibaca dalam bahasa sehari-hari, lalu dipetakan ke tiga pasar
 # (Indonesia, AS, global) dan dua horizon (hari ini, beberapa bulan ke depan).
@@ -1134,12 +1156,17 @@ def make_chart(ev, now):
     peak_i = _extreme_index(act, x, True)
     trough_i = _extreme_index(act, x, False)
     show_marks = act[peak_i] != act[trough_i]
+    badge = move_badge(ev)
     occupied = []
     fig.canvas.draw()
     value_style = dict(
         ha="center", fontsize=8, color="#7A1020", fontweight="bold", zorder=7, clip_on=False,
         bbox={"boxstyle": "round,pad=0.15", "fc": "white", "ec": "none", "alpha": 0.92},
     )
+    last = len(act) - 1
+    if badge:
+        ax.scatter([x[last]], [act[last]], s=110, color=badge["color"], edgecolor="white",
+                   linewidth=1.8, zorder=6)
     for i, (when, val) in enumerate(zip(x, act)):
         above = True
         if 0 < i < len(act) - 1:
@@ -1148,7 +1175,12 @@ def make_chart(ev, now):
         for dy in ((14, 28, 42, -16, -30, -44) if above else (-16, -30, -44, 14, 28, 42)):
             for dx in (0, 16, -16, 32, -32):
                 offsets.append((dx, dy))
-        _place_note(ax, fig, (when, val), f"{val:.2f}{suffix}", offsets, occupied, **value_style)
+        label = f"{val:.2f}{suffix}"
+        style = dict(value_style)
+        if i == last and badge:
+            style["color"] = badge["color"]
+            label = f"{label}\n{badge['text']}"
+        _place_note(ax, fig, (when, val), label, offsets, occupied, **style)
     if show_marks:
         for idx, kind, prefer in ((peak_i, "Puncak", 1), (trough_i, "Dasar", -1)):
             when = x[idx]
@@ -1192,13 +1224,17 @@ def release_embed(ev, events, now):
     read = _merge_read(rule, llm_analysis(ev, level, rule, nxt))
     d, diff, base = surprise(ev)
     surp = "–" if diff is None else ("sesuai" if d == 0 else f"{round(diff, 4):+g} vs {base}")
+    badge = move_badge(ev)
+    actual_value = f"**{fmt_val(ev, 'actual')}**"
+    if badge:
+        actual_value = f"{actual_value}\n{badge['text']}"
     embed = {
         "title": f"{emoji} {FLAGS.get(ev['country'], ev['country'])} {ev['title']}"
                  + (f" ({ev['period']})" if ev.get("period") else ""),
         "color": color,
         "description": _clip(read["ringkasan"], 1500),
         "fields": [
-            {"name": "Actual", "value": f"**{fmt_val(ev, 'actual')}**", "inline": True},
+            {"name": "Actual", "value": actual_value, "inline": True},
             {"name": "Forecast", "value": fmt_val(ev, "forecast"), "inline": True},
             {"name": "Previous", "value": fmt_val(ev, "previous"), "inline": True},
             {"name": "Selisih", "value": surp, "inline": True},
@@ -1630,11 +1666,13 @@ def test_send(now):
     if ev is None:
         return
     log.info("TES: mengirim %s %s (%s)", ev.get("country"), ev.get("title"), ev.get("date"))
+    badge = move_badge(ev)
+    log.info("TES gerak: %s", badge["text"] if badge else "tanpa pembanding")
     embed = release_embed(ev, evs, now)
     embed["title"] = "🧪 TES · " + embed["title"]
     log.info("TES ringkasan: %s", embed.get("description"))
     for field in embed.get("fields") or []:
-        if field.get("name") in ("Pasar Indonesia", "Pasar Amerika", "Global"):
+        if field.get("name") in ("Actual", "Pasar Indonesia", "Pasar Amerika", "Global"):
             log.info("TES %s: %s", field["name"], (field.get("value") or "").replace("\n", " | "))
     png = make_chart(ev, now)
     if png:
