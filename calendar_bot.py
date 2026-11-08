@@ -163,26 +163,80 @@ def surprise(ev):
     return (1 if diff > 0 else -1), diff, label
 
 
+# Naik pada jenis ini = kabar baik bagi ekonomi indikator itu. None = tidak ada arah baik/buruk.
+_HIGHER_IS_GOOD = {
+    "jobs": True,
+    "growth": True,
+    "unemployment": False,
+    "inflation": False,
+    "rate": False,
+}
+MOVE_GOOD = "#14804A"
+MOVE_BAD = "#C8102E"
+MOVE_NEUTRAL = "#5C6770"
+
+
+def _news(typ, direction):
+    """good, bad, atau neutral. Arah panah tidak sama dengan warna."""
+    if direction == 0:
+        return "neutral"
+    higher = _HIGHER_IS_GOOD.get(typ)
+    if higher is None:
+        return "neutral"
+    rose = direction > 0
+    return "good" if (rose if higher else not rose) else "bad"
+
+
+def _format_delta(ev, diff):
+    """Selisih dalam satuan seri: K/nominal, persen, atau basis poin untuk suku bunga."""
+    scale = ev.get("scale") or ""
+    unit = (ev.get("unit") or "").strip()
+    typ = indicator_type(ev.get("title") or "")
+    low = unit.lower()
+    if typ == "rate" and unit == "%":
+        return f"{diff * 100:+,.2f} bp"
+    if low in ("bp", "bps", "basis point", "basis points"):
+        return f"{diff:+,.2f} bp"
+    num = f"{diff:+,.2f}{scale}"
+    if unit == "%":
+        return num + "%"
+    if unit:
+        return f"{num} {unit}"
+    return num
+
+
 def move_badge(ev):
-    """Panah dan persen vs basis yang sama dengan kolom Selisih.
-    Naik hijau, turun merah, datar tanpa panah. None kalau pembanding tidak ada."""
+    """Panah mengikuti naik/turunnya angka. Warna mengikuti baik/buruknya bagi indikator.
+    Teks memakai satuan seri, bukan persen perubahan relatif. None kalau tidak ada pembanding."""
     direction, diff, _label = surprise(ev)
     actual = ev.get("actual")
     base = ev.get("forecast") if ev.get("forecast") is not None else ev.get("previous")
     if diff is None or actual is None or base is None:
         return None
+    typ = indicator_type(ev.get("title") or "")
+    news = _news(typ, direction)
+    color = {"good": MOVE_GOOD, "bad": MOVE_BAD, "neutral": MOVE_NEUTRAL}[news]
     if direction == 0 or abs(diff) < 1e-9:
-        return {"flat": True, "up": False, "text": "0.00%", "color": "#5C6770"}
-    if abs(base) < 1e-12:
-        return None
-    pct = (actual - base) / abs(base) * 100.0
-    up = pct > 0
+        text = _format_delta(ev, 0.0)
+        if text.startswith("+"):
+            text = text[1:]
+        return {"flat": True, "up": False, "text": text, "color": MOVE_NEUTRAL, "news": "neutral"}
+    arrow = "▲" if direction > 0 else "▼"
     return {
         "flat": False,
-        "up": up,
-        "text": f"{'▲' if up else '▼'} {pct:+.2f}%",
-        "color": "#14804A" if up else "#C8102E",
+        "up": direction > 0,
+        "text": f"{arrow} {_format_delta(ev, diff)}",
+        "color": color,
+        "news": news,
     }
+
+
+def _with_move(text, ev):
+    """Sisipkan panah dan perubahan di awal narasi. Grafik tidak menggambar teks ini."""
+    badge = move_badge(ev)
+    if not badge:
+        return text, None
+    return f"{badge['text']}. {text}", badge
 
 
 # ---------------------------------------------------------------- bacaan makro
@@ -269,7 +323,7 @@ def _note(title):
     if "jobless" in t or "claims" in t:
         return "Ini data mingguan, bukan tingkat pengangguran sebulan."
     if any(k in t for k in ("nonfarm", "non-farm", "non farm", "payroll")):
-        return "Ini jumlah orang yang dapat kerja baru, bukan persentase pengangguran."
+        return "Ini jumlah orang yang memperoleh pekerjaan baru, bukan tingkat pengangguran."
     if "minutes" in t or "notulen" in t:
         return "Ini catatan rapat, bukan angka ekonomi yang baru."
     if "qoq" in t and "yoy" not in t:
@@ -287,23 +341,26 @@ def _dir_phrase(f):
         return "Angkanya pas dengan perkiraan"
     up = kind == "hot"
     if family == "rate":
-        return "Bunga lebih tinggi dari perkiraan" if up else "Bunga lebih rendah dari perkiraan"
+        return "Suku bunga kebijakan lebih tinggi daripada perkiraan" if up else "Suku bunga kebijakan lebih rendah daripada perkiraan"
     if family == "prices":
         if any(k in t for k in ("hourly", "wage", "earnings")):
-            return "Upah naik lebih cepat dari perkiraan" if up else "Upah naik lebih pelan dari perkiraan"
-        return "Harga naik lebih cepat dari perkiraan" if up else "Harga naik lebih pelan dari perkiraan"
+            return "Upah naik lebih cepat daripada perkiraan" if up else "Upah naik lebih lambat daripada perkiraan"
+        return "Harga konsumen naik lebih cepat daripada perkiraan" if up else "Harga konsumen naik lebih lambat daripada perkiraan"
     if family == "labor":
+        if "unemployment" in t:
+            return ("Tingkat pengangguran lebih rendah daripada perkiraan" if up else
+                    "Tingkat pengangguran lebih tinggi daripada perkiraan")
         if "jobless" in t or "claims" in t:
-            return ("Lebih sedikit orang menganggur dari perkiraan" if up else
-                    "Lebih banyak orang menganggur dari perkiraan")
-        if any(k in t for k in ("payroll", "nonfarm", "non-farm", "non farm", "employment", "adp")):
-            return ("Perusahaan menambah pekerja lebih banyak dari perkiraan" if up else
-                    "Perusahaan menambah pekerja lebih sedikit dari perkiraan")
-        return ("Pengangguran lebih rendah dari perkiraan" if up else
-                "Pengangguran lebih tinggi dari perkiraan")
+            return ("Klaim pengangguran lebih sedikit daripada perkiraan" if up else
+                    "Klaim pengangguran lebih banyak daripada perkiraan")
+        if any(k in t for k in ("payroll", "nonfarm", "non-farm", "non farm", "employment change", "adp")):
+            return ("Perusahaan menambah tenaga kerja lebih banyak daripada perkiraan" if up else
+                    "Perusahaan menambah tenaga kerja lebih sedikit daripada perkiraan")
+        return ("Tingkat pengangguran lebih rendah daripada perkiraan" if up else
+                "Tingkat pengangguran lebih tinggi daripada perkiraan")
     if family == "growth":
-        return ("Ekonomi tumbuh lebih kencang dari perkiraan" if up else
-                "Ekonomi tumbuh lebih pelan dari perkiraan")
+        return ("Perekonomian tumbuh lebih cepat daripada perkiraan" if up else
+                "Perekonomian tumbuh lebih lambat daripada perkiraan")
     if family == "activity":
         return ("Survei bulan ini lebih kuat dari perkiraan" if up else
                 "Survei bulan ini lebih lemah dari perkiraan")
@@ -356,7 +413,7 @@ def _quiet():
         "Bunga BI tetap. Harga SBN dan IHSG tidak mendapat arah baru.",
         "Bunga surat utang AS dan saham AS tetap. The Fed tidak mengubah bunga.",
         "Bunga The Fed tetap. Saham AS tidak dihargai ulang.",
-        "Dolar tidak berubah, selera risiko (minat menaruh uang di aset yang untungnya tidak pasti) tetap, dan perdagangan barang tidak bergeser.",
+        "Dolar tidak berubah, selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) tetap, dan perdagangan barang tidak bergeser.",
         "Dolar dan arus perdagangan barang tetap seperti sebelumnya. Selera risiko tidak berubah.",
     )
 
@@ -382,41 +439,103 @@ def _us_tighten(up, global_long_up, global_long_down):
     )
 
 
+def _us_jobs(up):
+    """Perekrutan: tambahan tenaga kerja, bukan tingkat pengangguran."""
+    if up:
+        return _pack(
+            "Biaya dana dalam dolar tetap tinggi karena perusahaan di Amerika Serikat masih menambah tenaga kerja, sehingga rupiah melemah dan harga SBN (surat utang negara) turun. IHSG (saham Indonesia) tertekan oleh biaya dana itu, sedangkan BI tidak mengubah suku bunga pada hari yang sama.",
+            "Selama tambahan tenaga kerja menahan penurunan bunga The Fed, BI mempertahankan suku bunga. Harga SBN dan IHSG baru pulih setelah biaya dana dolar mereda.",
+            "Imbal hasil surat utang jangka pendek naik karena The Fed tidak memperoleh alasan menurunkan bunga ketika perekrutan masih kuat, dan saham yang bergantung pada pinjaman murah turun. Suku bunga kebijakan The Fed tidak berubah pada hari rilis.",
+            "The Fed mempertahankan suku bunga lebih lama selama permintaan tenaga kerja belum melemah. Saham yang membutuhkan pinjaman murah tetap tertekan sampai imbal hasil surat utang jangka pendek turun.",
+            "Dolar menguat terhadap euro dan yen karena imbal hasil Amerika Serikat tetap lebih menarik. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sedangkan arus perdagangan barang tidak berubah pada hari rilis.",
+            "Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat karena pasar tenaga kerja di sana belum longgar. Arus perdagangan barang tidak bergeser hanya oleh laporan perekrutan.",
+        )
+    return _pack(
+        "Peluang penurunan bunga The Fed membuka ruang bagi dana asing ke aset rupiah, sehingga rupiah menguat dan harga SBN (surat utang negara) naik. IHSG (saham Indonesia) naik karena biaya dana luar negeri mereda, dan BI tidak mengubah suku bunga pada hari yang sama.",
+        "BI memperoleh ruang menurunkan suku bunga setelah dolar mereda akibat perekrutan yang lebih lemah. Harga SBN dan IHSG menguat bersama rupiah.",
+        "Imbal hasil surat utang jangka pendek turun karena pasar mulai memperhitungkan penurunan bunga The Fed. Saham yang membutuhkan pinjaman murah naik, sedangkan suku bunga kebijakan belum diubah pada hari rilis.",
+        "The Fed menurunkan suku bunga apabila permintaan tenaga kerja tetap lemah. Saham yang bergantung pada pinjaman murah bertahan lebih tinggi selama imbal hasil surat utang rendah.",
+        "Dolar melemah terhadap euro dan yen seiring turunnya imbal hasil Amerika Serikat. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, dan perdagangan barang antarnegara tidak berubah pada hari rilis.",
+        "Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Arus barang antarnegara tidak bergeser.",
+    )
+
+
+def _us_unemployment(up):
+    """Tingkat pengangguran dan klaim: pencari kerja, bukan jumlah perekrutan."""
+    if up:
+        return _pack(
+            "Pencari kerja yang lebih sedikit membuat pasar tetap mengharapkan bunga The Fed tinggi, sehingga rupiah melemah terhadap dolar. Harga SBN (surat utang negara) turun karena imbal hasil acuan luar negeri tidak mereda, IHSG (saham Indonesia) melemah, dan BI tidak menyesuaikan suku bunga hari ini.",
+            "BI menahan suku bunga selama pengangguran yang rendah di Amerika Serikat menunda pemotongan bunga The Fed. Harga SBN serta IHSG baru membaik setelah dolar tidak lagi menekan biaya dana.",
+            "Imbal hasil surat utang jangka pendek lebih tinggi karena pengangguran yang rendah mengurangi alasan The Fed memotong bunga. Saham yang sensitif terhadap bunga kebijakan melemah, dan The Fed tidak mengubah suku bunga pada hari pengumuman.",
+            "The Fed mempertahankan suku bunga dalam beberapa bulan ke depan apabila pencari kerja tetap sedikit. Saham yang bergantung pada biaya pinjaman tetap tertekan.",
+            "Permintaan terhadap dolar naik terhadap euro dan yen karena imbal hasil Amerika Serikat tetap tinggi ketika pengangguran rendah, dan minat pada aset berisiko menurun. Perdagangan barang tidak berubah pada hari yang sama, sebab data ini tidak mengubah pesanan ekspor.",
+            "Dolar yang tetap kuat membuat pinjaman di luar Amerika Serikat mahal selama pengangguran di sana rendah. Arus perdagangan barang tidak bergeser.",
+        )
+    return _pack(
+        "Bertambahnya pencari kerja di Amerika Serikat membuka peluang bunga The Fed turun, sehingga rupiah menguat dan harga SBN (surat utang negara) naik. IHSG (saham Indonesia) naik karena biaya dana luar negeri mereda, sementara BI tidak mengubah suku bunga hari ini.",
+        "Setelah dolar mereda, BI memperoleh ruang menurunkan suku bunga. Harga SBN dan IHSG menguat selama tekanan dana asing berkurang.",
+        "Imbal hasil surat utang jangka pendek turun karena lebih banyak orang tanpa pekerjaan memberi alasan bagi The Fed untuk melonggarkan bunga. Saham yang sensitif terhadap biaya pinjaman naik, dan suku bunga kebijakan belum diubah hari ini.",
+        "The Fed menurunkan suku bunga apabila tingkat pengangguran tetap lebih tinggi. Saham yang membutuhkan pinjaman murah bertahan naik.",
+        "Dolar melemah terhadap euro dan yen seiring ekspektasi bunga Amerika Serikat yang lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, sedangkan pesanan perdagangan barang tidak berubah pada hari rilis.",
+        "Pinjaman di luar Amerika Serikat menjadi lebih murah. Arus barang antarnegara tidak berubah hanya karena data pengangguran.",
+    )
+
+
+def _us_inflation(up):
+    """Harga konsumen: daya beli dan laju harga, bukan laporan tenaga kerja."""
+    if up:
+        return _pack(
+            "Karena harga konsumen di Amerika Serikat naik lebih cepat, pasar menunda harapan pemotongan bunga dan rupiah melemah. Harga SBN (surat utang negara) turun, IHSG (saham Indonesia) tertekan biaya dana dolar, dan BI menahan suku bunga.",
+            "BI mempertahankan suku bunga selama inflasi Amerika Serikat menahan The Fed. Harga SBN dan IHSG baru membaik setelah tekanan harga di sana mereda.",
+            "Imbal hasil surat utang jangka pendek naik karena The Fed lebih sulit menurunkan bunga ketika harga konsumen masih naik. Saham yang sensitif terhadap daya beli melemah, dan suku bunga kebijakan tidak diubah pada hari rilis.",
+            "The Fed menahan suku bunga lebih lama sampai laju harga mendekati sasaran. Saham yang bergantung pada pinjaman murah tetap tertekan selama imbal hasil itu tinggi.",
+            "Dolar menguat terhadap euro dan yen karena imbal hasil mengikuti kenaikan harga konsumen, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun. Volume perdagangan barang tidak berubah pada hari rilis.",
+            "Harga barang di luar Amerika Serikat menghadapi tekanan naik. Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat karena inflasi di sana belum reda.",
+        )
+    return _pack(
+        "Harga konsumen yang lebih tenang membuka peluang bunga The Fed turun, dan rupiah menguat. Harga SBN (surat utang negara) naik, IHSG (saham Indonesia) naik karena biaya dana mereda, dan BI memperoleh ruang menurunkan suku bunga.",
+        "BI menurunkan suku bunga setelah dolar mereda karena inflasi Amerika Serikat lebih rendah. Harga SBN tetap lebih tinggi selama laju harga di sana tenang.",
+        "Imbal hasil surat utang jangka pendek turun karena The Fed memperoleh ruang menurunkan bunga ketika harga konsumen melambat. Saham yang bergantung pada daya beli naik, dan suku bunga kebijakan belum diubah hari ini.",
+        "The Fed menurunkan suku bunga. Saham yang membutuhkan pinjaman murah menguat selama laju harga tetap lebih rendah.",
+        "Dolar melemah terhadap euro dan yen seiring imbal hasil yang turun karena harga lebih tenang, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat. Volume perdagangan barang tidak berubah pada hari rilis.",
+        "Harga barang di luar Amerika Serikat menghadapi tekanan turun. Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah.",
+    )
+
+
+def _us_rates(up):
+    """Keputusan suku bunga: harga uang itu sendiri, dalam basis poin pada ringkasan."""
+    if up:
+        return _pack(
+            "Kenaikan suku bunga kebijakan Amerika Serikat memperlebar selisih bunga terhadap Indonesia, sehingga rupiah melemah dan harga SBN (surat utang negara) turun. IHSG (saham Indonesia) turun karena biaya dana luar negeri naik, dan BI tidak mengubah suku bunga pada hari yang sama.",
+            "BI menahan suku bunga karena bunga kebijakan Amerika Serikat lebih tinggi daripada bunga Indonesia. Harga SBN dan IHSG tetap tertekan selama selisih itu melebar.",
+            "The Fed menaikkan suku bunga kebijakan, dan imbal hasil surat utang jangka pendek naik mengikuti keputusan itu. Saham turun karena biaya pinjaman perusahaan menjadi lebih mahal.",
+            "Biaya utang perusahaan Amerika Serikat tetap lebih mahal. Saham baru pulih setelah The Fed menurunkan suku bunga kembali.",
+            "Dolar menguat karena bunga kebijakan Amerika Serikat lebih tinggi, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun. Perdagangan barang tidak berubah pada hari keputusan.",
+            "Pinjaman di luar Amerika Serikat menjadi lebih mahal. Arus perdagangan barang tidak bergeser.",
+        )
+    return _pack(
+        "Penurunan suku bunga kebijakan Amerika Serikat mempersempit selisih bunga, sehingga rupiah menguat dan harga SBN (surat utang negara) naik. IHSG (saham Indonesia) naik karena biaya dana luar negeri turun, dan BI tidak mengubah suku bunga pada hari yang sama.",
+        "BI menurunkan suku bunga setelah dolar mereda akibat pelonggaran The Fed. Harga SBN dan IHSG menguat bersama rupiah.",
+        "The Fed menurunkan suku bunga kebijakan. Imbal hasil surat utang jangka pendek turun, dan saham naik karena biaya pinjaman perusahaan lebih murah.",
+        "Tagihan utang perusahaan menjadi lebih ringan. Saham yang membutuhkan pinjaman murah bertahan lebih tinggi.",
+        "Dolar melemah karena bunga kebijakan Amerika Serikat lebih rendah, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat. Perdagangan barang tidak berubah pada hari keputusan.",
+        "Pinjaman di luar Amerika Serikat menjadi lebih murah. Arus perdagangan barang tidak bergeser.",
+    )
+
+
 def _market_lines(f):
     origin, family, kind = f["origin"], f["family"], f["kind"]
     if kind in ("unknown", "inline"):
         return _quiet()
     up = kind == "hot"
     if origin == "US" and family == "labor":
-        return _us_tighten(
-            up,
-            "Dolar yang lebih kuat membuat pinjaman di luar AS tetap mahal. Arus perdagangan barang tidak bergeser.",
-            "Pinjaman di luar AS jadi lebih murah mengikuti dolar yang lebih lemah. Arus perdagangan barang tidak bergeser.",
-        )
+        if f.get("typ") == "unemployment":
+            return _us_unemployment(up)
+        return _us_jobs(up)
     if origin == "US" and family == "prices":
-        return _us_tighten(
-            up,
-            "Harga barang di luar AS ikut naik. Dolar yang lebih kuat tetap membuat pinjaman di luar AS mahal.",
-            "Harga barang di luar AS ikut turun. Pinjaman di luar AS jadi lebih murah mengikuti dolar yang lebih lemah.",
-        )
+        return _us_inflation(up)
     if origin == "US" and family == "rate":
-        if up:
-            return _pack(
-                "Rupiah melemah, harga SBN turun, dan IHSG turun hari ini. BI tidak mengubah bunga pada hari yang sama.",
-                "BI menahan bunga karena bunga AS lebih tinggi dari bunga Indonesia. Harga SBN dan IHSG tetap berat selama bunga AS lebih tinggi.",
-                "The Fed menaikkan bunga hari ini. Bunga surat utang jangka pendek naik, dan saham turun.",
-                "Tagihan utang AS tetap lebih mahal. Saham baru lega setelah The Fed menurunkan bunga lagi.",
-                "Dolar menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah pada hari keputusan.",
-                "Pinjaman di luar AS jadi lebih mahal. Arus perdagangan barang tidak bergeser.",
-            )
-        return _pack(
-            "Rupiah menguat, harga SBN naik, dan IHSG naik hari ini. BI tidak mengubah bunga pada hari yang sama.",
-            "BI menurunkan bunga setelah dolar mereda. Harga SBN dan IHSG naik bersama rupiah.",
-            "The Fed menurunkan bunga hari ini. Bunga surat utang jangka pendek turun, dan saham naik.",
-            "Tagihan utang AS jadi lebih murah. Saham yang butuh pinjaman murah tetap lebih tinggi.",
-            "Dolar melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah pada hari keputusan.",
-            "Pinjaman di luar AS jadi lebih murah. Arus perdagangan barang tidak bergeser.",
-        )
+        return _us_rates(up)
     if origin == "US" and family == "guidance":
         if up:
             return _pack(
@@ -534,25 +653,25 @@ def _id_lines(f, up):
     lines = _quiet()
     if family == "rate":
         lines["id_pendek"] = (
-            "Rupiah menguat dan harga SBN turun hari ini. Di IHSG, saham bank diuntungkan dan saham properti tertekan, karena BI menaikkan bunga."
+            "BI menaikkan suku bunga kebijakan, sehingga kredit lebih mahal dan harga SBN (surat utang negara) turun. Rupiah menguat karena selisih bunga lebih menarik, sedangkan di IHSG (saham Indonesia) saham bank diuntungkan dan saham properti tertekan."
             if up else
-            "Rupiah melemah dan harga SBN naik hari ini. Di IHSG, saham properti naik dan saham bank tertekan, karena BI menurunkan bunga."
+            "BI menurunkan suku bunga kebijakan, sehingga angsuran kredit lebih ringan dan harga SBN (surat utang negara) naik. Rupiah melemah karena selisih bunga menyempit, sedangkan di IHSG (saham Indonesia) saham properti naik dan saham bank tertekan."
         )
         lines["id_panjang"] = (
-            "Bunga pinjaman di dalam negeri tetap lebih mahal. BI baru menurunkan bunga setelah rupiah aman."
+            "Biaya pinjaman di dalam negeri tetap lebih mahal. BI baru menurunkan suku bunga setelah rupiah dinilai aman."
             if up else
-            "Bunga pinjaman di dalam negeri lebih murah. BI tidak menurunkannya jauh di bawah The Fed, supaya rupiah tidak jatuh lagi."
+            "Biaya pinjaman di dalam negeri lebih murah. BI tidak menurunkannya jauh di bawah The Fed, agar rupiah tidak melemah kembali."
         )
     elif family == "prices":
         lines["id_pendek"] = (
-            "Harga barang naik, harga SBN turun, dan saham konsumen di IHSG turun hari ini. BI menahan bunga."
+            "Kenaikan harga barang mengikis daya beli, sehingga saham konsumen di IHSG (saham Indonesia) turun dan harga SBN (surat utang negara) turun. BI menahan suku bunga, dan rupiah tidak memperoleh dukungan baru pada hari rilis."
             if up else
-            "Harga barang lebih tenang, harga SBN naik, dan saham konsumen di IHSG naik hari ini. BI mendapat ruang menurunkan bunga."
+            "Harga barang yang lebih tenang memulihkan daya beli, sehingga saham konsumen di IHSG (saham Indonesia) naik dan harga SBN (surat utang negara) naik. BI memperoleh ruang menurunkan suku bunga, dan rupiah tidak tertekan oleh data harga ini."
         )
         lines["id_panjang"] = (
-            "Daya beli menipis dan BI menahan bunga. Harga SBN baru naik setelah harga barang reda."
+            "Daya beli menipis dan BI menahan suku bunga. Harga SBN baru naik setelah laju harga mereda."
             if up else
-            "Daya beli lega dan BI menurunkan bunga. Harga SBN tetap lebih tinggi selama harga barang tenang."
+            "Daya beli pulih dan BI menurunkan suku bunga. Harga SBN tetap lebih tinggi selama harga barang tenang."
         )
     elif family == "labor":
         lines["id_pendek"] = (
@@ -567,14 +686,32 @@ def _id_lines(f, up):
         )
     elif family == "growth":
         lines["id_pendek"] = (
-            "IHSG naik dan rupiah menguat hari ini. Harga SBN ikut naik. BI tidak mengubah bunga pada hari rilis."
+            "Permintaan dalam negeri yang lebih kuat menaikkan prospek laba emiten, sehingga IHSG (saham Indonesia) naik. Rupiah menguat karena aliran modal melihat pertumbuhan itu, harga SBN (surat utang negara) naik, dan BI tidak mengubah suku bunga pada hari rilis."
             if up else
-            "IHSG turun dan rupiah melemah hari ini. Harga SBN ikut turun. BI tidak mengubah bunga pada hari rilis."
+            "Emiten kehilangan dukungan permintaan dalam negeri, dan IHSG (saham Indonesia) turun karena proyeksi laba dipangkas. Aliran modal yang lebih hati-hati melemahkan rupiah serta harga SBN (surat utang negara), sedangkan BI tidak mengubah suku bunga hari ini."
         )
         lines["id_panjang"] = (
-            "BI menahan bunga karena ekonomi dalam negeri sudah kuat. IHSG tetap lebih tinggi selama pertumbuhan ini bertahan."
+            "BI tidak menurunkan suku bunga hanya untuk menopang kegiatan ekonomi yang sudah berada di atas perkiraan. IHSG tetap lebih tinggi, dan harga SBN mengikuti rupiah, selama permintaan dalam negeri bertahan."
             if up else
-            "BI menurunkan bunga. IHSG tetap lebih rendah selama ekonomi dalam negeri melambat."
+            "BI menurunkan suku bunga untuk menopang kegiatan ekonomi yang melambat. IHSG tetap lebih rendah, dan harga SBN baru pulih setelah pertumbuhan stabil."
+        )
+        lines["us_pendek"] = (
+            "Imbal hasil surat utang Amerika Serikat dan saham di sana tidak bergerak, karena pertumbuhan Indonesia bukan alasan bagi The Fed untuk mengubah bunga. The Fed tidak mengubah suku bunga kebijakan."
+            if up else
+            "Saham dan imbal hasil surat utang Amerika Serikat tidak bereaksi, sebab perlambatan di Indonesia tidak mengubah perhitungan bunga The Fed. Suku bunga kebijakan The Fed tetap."
+        )
+        lines["us_panjang"] = (
+            "Jalur suku bunga The Fed tetap ditentukan oleh data Amerika Serikat, bukan oleh pertumbuhan Indonesia. Saham Amerika Serikat tidak dihargai ulang."
+        )
+        lines["global_pendek"] = (
+            "Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) terhadap aset negara berkembang meningkat karena kegiatan ekonomi Indonesia lebih kuat, sementara dolar terhadap euro tidak banyak berubah. Perdagangan barang belum berubah pada hari pengumuman."
+            if up else
+            "Minat terhadap aset negara berkembang menurun ketika pertumbuhan Indonesia lebih lambat. Dolar terhadap euro hampir tidak berubah, dan arus barang belum bergeser pada hari rilis."
+        )
+        lines["global_panjang"] = (
+            "Permintaan impor bahan baku mengikuti kegiatan ekonomi yang lebih kuat. Dolar dan arus perdagangan global tidak bergeser pada hari angka ini diumumkan."
+            if up else
+            "Permintaan impor bahan baku menyusut mengikuti kegiatan yang lebih lambat. Dolar tidak berubah arah hanya karena pengumuman ini."
         )
     elif family == "activity":
         lines["id_pendek"] = (
@@ -800,7 +937,9 @@ def llm_analysis(ev, level, read, next_txt):
                                        "previous", "unit", "scale", "source")}
     peta = {k: read.get(k) for k in ("ringkasan",) + MARKET_KEYS}
     prompt = (
-        "Kamu menjelaskan rilis ekonomi ke orang yang bukan ekonom, dalam bahasa Indonesia yang pendek dan biasa.\n"
+        "Kamu menjelaskan rilis ekonomi dalam bahasa Indonesia yang formal, padat, dan lugas.\n"
+        "Jangan pakai kencang, melaju, melonjak, atau motor pertumbuhan. "
+        "Pakai padanan formal: lebih cepat, meningkat, menurun.\n"
         "Jangan pakai kata stance, siklus, kanal, momentum, disinflasi, durasi, atau rezim. "
         "Kalau perlu menyebut bunga, dolar, rupiah, saham, atau harga barang, pakai kata itu saja.\n"
         "Gunakan HANYA angka yang diberikan. Jangan mengarang data lain. Jangan menyuruh beli atau jual.\n"
@@ -809,7 +948,10 @@ def llm_analysis(ev, level, read, next_txt):
         "(lebih banyak orang dapat kerja, harga naik lebih cepat, bunga lebih tinggi). "
         "Jangan tulis akibat ke rupiah, bunga, saham, atau dolar di ringkasan.\n"
         "id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang: "
-        "masing-masing SATU atau DUA kalimat pendek, padat, dan lengkap. Keenamnya harus berbeda.\n"
+        "masing-masing SATU atau DUA kalimat pendek, padat, dan lengkap. Keenamnya harus berbeda bentuknya.\n"
+        "Jangan ulang pola yang sama seperti 'IHSG naik, rupiah naik' di setiap horizon. "
+        "Untuk setiap akibat, sebutkan sebabnya dan kaitkan dengan jenis indikator ini. "
+        "Data tenaga kerja, pertumbuhan, inflasi, dan suku bunga tidak boleh memakai kalimat yang sama.\n"
         "Jangan ulang nama indikator. Jangan ulang kalimat fakta dari ringkasan. "
         "Jangan pakai biasanya, bisa, atau kalimat pengisi.\n"
         "Indonesia: sebut rupiah, SBN (surat utang negara), IHSG (saham Indonesia), dan BI.\n"
@@ -1130,6 +1272,14 @@ def make_chart(ev, now):
     act = [float(e["actual"]) for e in pts]
     fc = [e.get("forecast") for e in pts]
     suffix = (ev.get("scale") or "") + ("%" if ev.get("unit") == "%" else "")
+    badge = move_badge(ev)
+    news = (badge or {}).get("news")
+    if news == "good":
+        line_color, fill_color = MOVE_GOOD, "#E3F5EA"
+    elif news == "bad":
+        line_color, fill_color = MOVE_BAD, BRAND_SOFT
+    else:
+        line_color, fill_color = MOVE_NEUTRAL, "#EEF0F2"
 
     fig, ax = plt.subplots(figsize=(11.4, 5.6), dpi=140)
     fig.patch.set_facecolor("white")
@@ -1137,10 +1287,10 @@ def make_chart(ev, now):
     smooth_x, smooth_y = _smooth_curve(xs, act, n=480)
     smooth_when = mdates.num2date(smooth_x, tz=WIB)
     floor = min(act + [v for v in fc if v is not None])
-    ax.fill_between(smooth_when, smooth_y, floor, color=BRAND_SOFT, alpha=0.55, zorder=1)
-    ax.plot(smooth_when, smooth_y, color=BRAND_RED, lw=2.8, zorder=3, label="Actual",
+    ax.fill_between(smooth_when, smooth_y, floor, color=fill_color, alpha=0.55, zorder=1)
+    ax.plot(smooth_when, smooth_y, color=line_color, lw=2.8, zorder=3, label="Actual",
             solid_capstyle="round", solid_joinstyle="round")
-    ax.plot(x, act, linestyle="none", marker="o", ms=7, color=BRAND_RED,
+    ax.plot(x, act, linestyle="none", marker="o", ms=7, color=line_color,
             markeredgecolor="white", markeredgewidth=1.4, zorder=5)
     fx = [(a, b) for a, b in zip(x, fc) if b is not None]
     if len(fx) >= 2:
@@ -1156,17 +1306,12 @@ def make_chart(ev, now):
     peak_i = _extreme_index(act, x, True)
     trough_i = _extreme_index(act, x, False)
     show_marks = act[peak_i] != act[trough_i]
-    badge = move_badge(ev)
     occupied = []
     fig.canvas.draw()
     value_style = dict(
-        ha="center", fontsize=8, color="#7A1020", fontweight="bold", zorder=7, clip_on=False,
+        ha="center", fontsize=8, color=BRAND_DARK, fontweight="bold", zorder=7, clip_on=False,
         bbox={"boxstyle": "round,pad=0.15", "fc": "white", "ec": "none", "alpha": 0.92},
     )
-    last = len(act) - 1
-    if badge:
-        ax.scatter([x[last]], [act[last]], s=110, color=badge["color"], edgecolor="white",
-                   linewidth=1.8, zorder=6)
     for i, (when, val) in enumerate(zip(x, act)):
         above = True
         if 0 < i < len(act) - 1:
@@ -1175,12 +1320,7 @@ def make_chart(ev, now):
         for dy in ((14, 28, 42, -16, -30, -44) if above else (-16, -30, -44, 14, 28, 42)):
             for dx in (0, 16, -16, 32, -32):
                 offsets.append((dx, dy))
-        label = f"{val:.2f}{suffix}"
-        style = dict(value_style)
-        if i == last and badge:
-            style["color"] = badge["color"]
-            label = f"{label}\n{badge['text']}"
-        _place_note(ax, fig, (when, val), label, offsets, occupied, **style)
+        _place_note(ax, fig, (when, val), f"{val:.2f}{suffix}", offsets, occupied, **value_style)
     if show_marks:
         for idx, kind, prefer in ((peak_i, "Puncak", 1), (trough_i, "Dasar", -1)):
             when = x[idx]
@@ -1224,17 +1364,14 @@ def release_embed(ev, events, now):
     read = _merge_read(rule, llm_analysis(ev, level, rule, nxt))
     d, diff, base = surprise(ev)
     surp = "–" if diff is None else ("sesuai" if d == 0 else f"{round(diff, 4):+g} vs {base}")
-    badge = move_badge(ev)
-    actual_value = f"**{fmt_val(ev, 'actual')}**"
-    if badge:
-        actual_value = f"{actual_value}\n{badge['text']}"
+    summary, _badge = _with_move(read["ringkasan"], ev)
     embed = {
         "title": f"{emoji} {FLAGS.get(ev['country'], ev['country'])} {ev['title']}"
                  + (f" ({ev['period']})" if ev.get("period") else ""),
         "color": color,
-        "description": _clip(read["ringkasan"], 1500),
+        "description": _clip(summary, 1500),
         "fields": [
-            {"name": "Actual", "value": actual_value, "inline": True},
+            {"name": "Actual", "value": f"**{fmt_val(ev, 'actual')}**", "inline": True},
             {"name": "Forecast", "value": fmt_val(ev, "forecast"), "inline": True},
             {"name": "Previous", "value": fmt_val(ev, "previous"), "inline": True},
             {"name": "Selisih", "value": surp, "inline": True},
