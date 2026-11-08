@@ -53,6 +53,7 @@ DRY_RUN = os.getenv("DRY_RUN") == "1"
 SEND_PREVIEW = os.getenv("SEND_PREVIEW", "0") == "1"    # jadwal harian
 SEND_REMINDER = os.getenv("SEND_REMINDER", "0") == "1"  # pengingat sebelum rilis
 TEST_SEND = os.getenv("TEST_SEND", "0") == "1"  # kirim 1 rilis terakhir sebagai tes, lalu berhenti
+TEST_MATCH = os.getenv("TEST_MATCH", "").strip()  # kalau diisi, tes hanya rilis yang judulnya cocok
 SHEETS_URL = os.getenv("SHEETS_WEBHOOK_URL", "")
 SHEETS_TOKEN = os.getenv("SHEETS_TOKEN", "")
 BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "1830"))  # ±5 tahun riwayat untuk Google Sheets
@@ -163,8 +164,8 @@ def surprise(ev):
 
 
 # ---------------------------------------------------------------- bacaan makro
-# Rilis dibaca sebagai sinyal siklus dan reaksi kebijakan, lalu dipetakan ke
-# tiga pasar (Indonesia, AS, global) dan dua horizon (sesi rilis, siklus).
+# Rilis dibaca dalam bahasa sehari-hari, lalu dipetakan ke tiga pasar
+# (Indonesia, AS, global) dan dua horizon (hari ini, beberapa bulan ke depan).
 MARKET_KEYS = ("id_pendek", "id_panjang", "us_pendek", "us_panjang",
                "global_pendek", "global_panjang")
 
@@ -203,16 +204,8 @@ def _family(typ):
     }.get(typ, "activity")
 
 
-def _regime(family):
-    return {
-        "rate": "suku bunga", "prices": "inflasi", "labor": "pasar tenaga kerja",
-        "growth": "pertumbuhan", "activity": "momentum aktivitas", "trade": "neraca eksternal",
-        "reserves": "cadangan devisa", "guidance": "nada kebijakan",
-    }.get(family, "data ini")
-
-
 def _heat(typ, direction):
-    """hot = ekonomi/kebijakan lebih ketat atau lebih kuat; unemployment dibalik."""
+    """hot = ekonomi atau kebijakan lebih kuat. Pengangguran dibalik: naik berarti lebih lemah."""
     if typ == "unemployment":
         return "cold" if direction > 0 else "hot"
     return "hot" if direction > 0 else "cold"
@@ -223,7 +216,7 @@ def _facts(ev):
     typ = indicator_type(title)
     direction, diff, base = surprise(ev)
     if diff is None:
-        kind, paren = "unknown", "tanpa konsensus maupun previous"
+        kind, paren = "unknown", "tanpa perkiraan maupun previous"
     elif direction == 0:
         kind, paren = "inline", f"sesuai {base}"
     else:
@@ -236,135 +229,205 @@ def _facts(ev):
     }
 
 
-def _qualifier(title, typ):
+def _compact_title(title):
+    return "".join((title or "").lower().replace("-", " ").split())
+
+
+def _note(title):
+    """Satu kalimat tambahan, hanya kalau judulnya mudah salah baca."""
     t = (title or "").lower()
     if any(k in t for k in ("hourly", "wage", "earnings")):
-        return "Ini upah, yaitu biaya tenaga kerja, bukan indeks harga barang."
+        return "Ini upah pekerja, bukan harga barang di toko."
     if "ppi" in t or "producer price" in t:
-        return "Ini harga produsen, biasanya bergerak di depan harga konsumen."
-    if "pce" in t and "core" in t:
-        return "Ini PCE inti, ukuran harga yang paling ditimbang The Fed."
-    if "pce" in t:
-        return "Ini PCE, harga pengeluaran yang diawasi The Fed, bukan CPI headline."
+        return "Ini harga di pabrik. Harga di toko sering menyusul."
     if "core" in t or "inti" in t:
-        return "Ini inflasi inti, tanpa pangan dan energi yang berisik."
-    if typ == "inflation" and any(k in t for k in ("inflation", "cpi", "price index")):
-        return "Ini harga yang masih memuat komponen berisik, bukan ukuran inti."
+        return "Angka ini tidak menghitung pangan dan bensin, yang sering naik turun sendiri."
     if "adp" in t:
-        return "ADP adalah hitungan swasta sebelum payroll resmi, bobotnya di bawah NFP."
+        return "Ini hitungan perusahaan swasta, belum angka resmi pemerintah."
     if "jobless" in t or "claims" in t:
-        return "Klaim mingguan berisik. Ini bukan tingkat pengangguran bulanan."
+        return "Ini data mingguan, bukan tingkat pengangguran sebulan."
     if any(k in t for k in ("nonfarm", "non-farm", "non farm", "payroll")):
-        return "Payroll adalah laju perekrutan, bukan tingkat pengangguran."
+        return "Ini jumlah orang yang dapat kerja baru, bukan persentase pengangguran."
     if "minutes" in t or "notulen" in t:
-        return "Notulen memberi nada kebijakan, bukan data aktivitas baru."
-    if typ == "growth" and "qoq" in t and "yoy" not in t:
-        return "Ini laju kuartalan, bukan pertumbuhan setahun penuh."
+        return "Ini catatan rapat, bukan angka ekonomi yang baru."
+    if "qoq" in t and "yoy" not in t:
+        return "Ini perubahan satu kuartal, bukan setahun penuh."
     return ""
 
 
-def _signal(f):
-    """Arti makro cetakan ini, bukan kalimat menang/kalah dari konsensus."""
-    title, place, actor = f["title"], f["place"], f["actor"]
-    level = f"Actual {f['actual']} ({f['paren']})."
-    loc, kind, family = f"{title} {place}", f["kind"], f["family"]
+def _dir_phrase(f):
+    """Arah kejutan dalam kata sehari-hari, tanpa istilah analis."""
+    t = f["title"].lower()
+    kind, family = f["kind"], f["family"]
     if kind == "unknown":
-        return (f"{loc} hanya terbaca sebagai level. {level} Tanpa konsensus atau previous, "
-                f"arah {actor} tidak bisa dinilai dari selisih.")
+        return "Belum ada perkiraan untuk dibandingkan"
     if kind == "inline":
-        return (f"{loc} mengonfirmasi apa yang sudah dihargai, bukan memecahkannya. {level} "
-                f"Sinyalnya ada di level {_regime(family)} itu: {actor} tidak mendapat alasan baru "
-                "untuk berbelok hari ini.")
+        return "Angkanya pas dengan perkiraan"
     up = kind == "hot"
     if family == "rate":
-        return ((f"Keputusan bunga {place} lebih ketat dari yang dihargai. {level} "
-                 f"Ini sinyal langsung dari {actor}, bukan data yang masih bisa direvisi.") if up else
-                (f"Keputusan bunga {place} lebih longgar dari yang dihargai. {level} "
-                 f"{actor} menggeser harga uang sekarang, sebelum data aktivitas menyusul."))
+        return "Bunga lebih tinggi dari perkiraan" if up else "Bunga lebih rendah dari perkiraan"
     if family == "prices":
-        return ((f"{loc} menunjukkan tekanan harga yang belum reda. {level} "
-                 f"{actor} lebih sulit berbelok longgar selama pola ini belum balik.") if up else
-                (f"{loc} menunjukkan disinflasi yang berlanjut. {level} "
-                 f"Ruang {actor} untuk lebih longgar lebih lebar daripada sebelum rilis."))
+        if any(k in t for k in ("hourly", "wage", "earnings")):
+            return "Upah naik lebih cepat dari perkiraan" if up else "Upah naik lebih pelan dari perkiraan"
+        return "Harga naik lebih cepat dari perkiraan" if up else "Harga naik lebih pelan dari perkiraan"
     if family == "labor":
-        cause = _labor_cause(f, up)
-        return (f"{loc}: {cause}. {level} " +
-                (f"Selama pola ini bertahan, {actor} lebih sabar untuk melonggar." if up else
-                 f"Jika pola ini bertahan, {actor} mendapat alasan untuk lebih longgar."))
+        if "jobless" in t or "claims" in t:
+            return ("Lebih sedikit orang menganggur dari perkiraan" if up else
+                    "Lebih banyak orang menganggur dari perkiraan")
+        if any(k in t for k in ("payroll", "nonfarm", "non-farm", "non farm", "employment", "adp")):
+            return ("Perusahaan menambah pekerja lebih banyak dari perkiraan" if up else
+                    "Perusahaan menambah pekerja lebih sedikit dari perkiraan")
+        return ("Pengangguran lebih rendah dari perkiraan" if up else
+                "Pengangguran lebih tinggi dari perkiraan")
     if family == "growth":
-        return ((f"{loc} menunjukkan permintaan yang lebih kuat dari gambaran sebelumnya. {level} "
-                 f"Aktivitas lebih sehat, tetapi {actor} juga punya lebih sedikit alasan untuk memotong bunga.") if up else
-                (f"{loc} menunjukkan permintaan yang lebih lemah dari gambaran sebelumnya. {level} "
-                 f"Aktivitas melambat, dan {actor} mendapat alasan lebih besar untuk menahan atau melonggarkan stance."))
+        return ("Ekonomi tumbuh lebih kencang dari perkiraan" if up else
+                "Ekonomi tumbuh lebih pelan dari perkiraan")
     if family == "activity":
-        return ((f"{loc} adalah momentum bulanan yang lebih kuat, bukan reset siklus seperti GDP. {level} "
-                 f"{actor} baru menggeser stance jika momentum ini bertahan, bukan karena satu bulan.") if up else
-                (f"{loc} adalah momentum bulanan yang melemah, dan satu bulan masih bisa balik. {level} "
-                 f"{actor} menunggu konfirmasi sebelum mengubah stance."))
+        return ("Survei bulan ini lebih kuat dari perkiraan" if up else
+                "Survei bulan ini lebih lemah dari perkiraan")
     if family == "trade":
-        return ((f"{loc} menunjukkan neraca eksternal yang lebih kuat. {level} "
-                 f"Pasokan valas lebih tebal. Ini bukan sinyal inflasi dan tidak otomatis mengubah {actor}.") if up else
-                (f"{loc} menunjukkan neraca eksternal yang lebih lemah. {level} "
-                 "Pasokan valas menipis. Komposisi harga versus volume tidak terlihat di angka agregat ini."))
+        return ("Ekspor lebih unggul dari perkiraan" if up else
+                "Ekspor kalah dari impor lebih besar dari perkiraan")
     if family == "reserves":
-        return ((f"{loc} menunjukkan bantalan devisa yang bertambah. {level} "
-                 "Kapasitas menjaga mata uang naik. Ini neraca stok, bukan pertumbuhan.") if up else
-                (f"{loc} menunjukkan devisa yang terpakai. {level} "
-                 "Itu sering berarti intervensi atau arus keluar, bukan serta-merta pelemahan pertumbuhan."))
+        return "Cadangan dolar bertambah" if up else "Cadangan dolar berkurang"
     if family == "guidance":
-        return ((f"{loc} bernada lebih ketat dari yang dihargai. {level} "
-                 f"Yang berubah adalah reaksi {actor}, bukan data aktivitas baru.") if up else
-                (f"{loc} bernada lebih longgar dari yang dihargai. {level} "
-                 f"Yang berubah adalah reaksi {actor}, bukan data aktivitas baru."))
-    return f"{loc}. {level}"
+        return ("Bank sentral terdengar lebih condong menahan bunga tinggi" if up else
+                "Bank sentral terdengar lebih condong menurunkan bunga")
+    return "Lebih kuat dari perkiraan" if up else "Lebih lemah dari perkiraan"
 
 
-def _bound(f):
-    """Apa yang satu rilis ini belum buktikan, plus kanal lintas pasar yang dominan."""
+def _everyday(f):
+    phrase = _dir_phrase(f)
+    place = f["place"]
+    if f["kind"] in ("unknown", "inline"):
+        return f"{phrase}."
+    if f["family"] == "activity":
+        return f"{phrase}. Ini gambaran satu bulan di {place}, bukan ukuran ekonomi setahun."
+    if f["family"] == "labor" and any(k in f["title"].lower() for k in ("payroll", "nonfarm", "non-farm", "non farm")):
+        return f"{phrase}."
+    if f["family"] == "rate":
+        return f"{phrase}."
+    return f"{phrase}."
+
+
+def _today_limit(f):
+    """Dua kalimat: apa yang biasanya terjadi hari ini, dan apa yang belum diputuskan."""
     origin, family, kind = f["origin"], f["family"], f["kind"]
     actor, place = f["actor"], f["place"]
     if kind == "unknown":
-        return "Sebelum ada pembanding, arah kebijakan belum bisa disebut lebih ketat atau lebih longgar."
+        return ("Hari ini rupiah tidak dapat arah baru.",
+                "BI dan The Fed tidak mengubah bunga sebelum ada angka pembanding.")
     if kind == "inline":
-        return "Yang masih mengikat harga aset adalah levelnya, bukan selisih nol pada hari ini."
-    if origin == "US" and family == "growth":
-        return ("Dua kanal berjalan bersamaan: permintaan dan jalur bunga The Fed tidak bergerak ke arah yang sama. "
-                "Sesi pertama biasanya mengikuti dolar, bukan cerita ekspor.")
-    if origin == "US" and family == "activity":
-        return "Satu bulan aktivitas belum mengubah siklus. Kanal ke rupiah hari ini ada, tetapi BI dan The Fed menunggu konfirmasi."
-    if origin == "US" and family == "trade":
-        return "Neraca dagang AS bukan input utama reaksi The Fed, jadi efeknya ke rupiah kecil dibanding inflasi, tenaga kerja, atau keputusan bunga."
-    if origin == "US" and family == "reserves":
-        return "Cadangan devisa AS bukan alat The Fed dan bukan sinyal permintaan untuk ekspor Indonesia."
+        return ("Hari ini tidak ada kejutan, jadi rupiah tidak dapat dorongan baru.",
+                "Bunga tidak berubah hanya karena angkanya sesuai perkiraan.")
+    up = kind == "hot"
     if origin == "US" and family in ("prices", "labor", "rate", "guidance"):
-        return ("Kanal ke Indonesia berjalan lewat dolar dan imbal hasil AS yang lebih tinggi, bukan lewat rapat BI hari ini."
-                if kind == "hot" else
-                "Kanal ke Indonesia berjalan lewat dolar dan imbal hasil AS yang lebih longgar, sehingga ruang BI ikut lebih lega.")
-    if origin == "ID":
-        return "Ini cetakan domestik: yang bisa berubah adalah reaksi BI dan valas di dalam negeri. The Fed tidak memakai angka Indonesia."
+        today = ("Hari ini dolar biasanya menguat, jadi rupiah bisa melemah." if up else
+                 "Hari ini dolar biasanya melemah, jadi rupiah bisa sedikit naik.")
+        limit = ("The Fed dan BI tidak mengubah bunga hanya karena satu laporan." if up else
+                 "Bunga baru diturunkan jika angka seperti ini berulang, bukan karena satu kali.")
+        return today, limit
+    if origin == "US" and family == "activity":
+        return (("Hari ini dolar bisa menguat sebentar, dan rupiah ikut tertekan." if up else
+                 "Hari ini dolar bisa sedikit melemah, dan rupiah bisa sedikit lega."),
+                "Satu survei belum membuat The Fed atau BI mengubah bunga.")
+    if origin == "US" and family == "growth":
+        return (("Hari ini rupiah biasanya ikut dolar, yang bisa tetap kuat." if up else
+                 "Hari ini orang lebih hati-hati, dan rupiah bisa melemah dulu."),
+                ("Ekonomi yang lebih kuat bagus untuk bisnis, tapi The Fed kurang alasan menurunkan bunga." if up else
+                 "Kalau ekonomi AS memang melambat, The Fed baru punya alasan menurunkan bunga."))
+    if origin == "US" and family == "trade":
+        return ("Efeknya ke rupiah kecil pada hari ini.",
+                "The Fed tidak mengubah bunga karena neraca dagang.")
+    if origin == "US" and family == "reserves":
+        return ("Cadangan devisa AS tidak menggerakkan rupiah hari ini.",
+                "The Fed tidak memakai angka cadangan untuk menentukan bunga.")
+    if origin == "ID" and family == "rate":
+        return (("Bunga lebih tinggi menahan rupiah hari ini, tapi pinjaman jadi lebih mahal." if up else
+                 "Bunga lebih rendah membuat pinjaman lebih murah, tapi rupiah bisa melemah."),
+                "The Fed tidak ikut berubah. Yang berubah ada di Indonesia.")
+    if origin == "ID" and family == "prices":
+        return (("Orang mengira BI akan menahan bunga. Harga surat utang bisa turun hari ini." if up else
+                 "Orang mengira BI bisa menurunkan bunga. Harga surat utang bisa naik hari ini."),
+                ("Daya beli menyempit selama harga tetap naik cepat." if up else
+                 "Itu baru terjadi jika harga yang tenang ini bukan cuma sekali."))
+    if origin == "ID" and family == "labor":
+        return (("Lebih banyak orang kerja menopang belanja di dalam negeri. Rupiah tidak otomatis menguat." if up else
+                 "Lebih susah dapat kerja menekan belanja di dalam negeri. Rupiah bisa ikut lemah."),
+                ("BI kurang alasan menurunkan bunga jika lowongan tetap banyak." if up else
+                 "BI baru menurunkan bunga jika ini berulang, dan tetap menjaga rupiah."))
+    if origin == "ID" and family == "growth":
+        return (("Ekonomi yang lebih kuat menolong saham Indonesia dan kepercayaan ke rupiah hari ini." if up else
+                 "Ekonomi yang lebih pelan menekan saham Indonesia, dan rupiah jadi lebih rentan hari ini."),
+                ("BI kurang terdesak menurunkan bunga jika ekonomi sudah kuat." if up else
+                 "Dorongan agar BI menurunkan bunga naik, tapi penurunan yang terlalu besar bisa menekan rupiah lagi."))
+    if origin == "ID" and family == "activity":
+        return ("Ini cuma survei satu bulan. BI tidak mengubah bunga hari ini.",
+                "BI baru mengubah bunga jika survei yang searah ini berulang beberapa bulan.")
+    if origin == "ID" and family == "trade":
+        return (("Uang dari luar lebih banyak masuk, jadi rupiah dapat dukungan hari ini." if up else
+                 "Uang dari luar lebih sedikit masuk, jadi rupiah lebih rentan hari ini."),
+                "BI tidak otomatis mengubah bunga. Angka ini tidak membedakan harga barang ekspor dan jumlah barang.")
+    if origin == "ID" and family == "reserves":
+        return (("BI punya lebih banyak dolar untuk menjaga rupiah. Ini bukan tanda ekonomi tumbuh." if up else
+                 "Cadangan yang turun sering berarti BI sedang menahan rupiah, atau ada uang yang keluar."),
+                ("Cadangan yang lebih tebal membuat BI lebih mampu menahan gejolak." if up else
+                 "Kalau cadangan terus turun, BI lebih sulit menjaga rupiah tanpa menaikkan bunga."))
+    if origin == "ID" and family == "guidance":
+        return (("BI terdengar lebih condong menahan bunga tinggi. Rupiah dapat dukungan hari ini." if up else
+                 "BI terdengar lebih condong menurunkan bunga. Rupiah bisa melemah hari ini."),
+                "Bunga baru benar-benar berubah jika keputusan berikutnya mengikuti kata-kata ini.")
+    if origin == "CN" and family in ("growth", "activity"):
+        return (("China yang lebih kuat biasanya mengangkat harga batu bara, nikel, dan sawit." if up else
+                 "China yang lebih pelan biasanya menekan harga batu bara, nikel, dan sawit."),
+                "BI tidak mengubah bunga karena data China. Ekspor baru benar-benar berubah jika ini bertahan.")
+    if origin == "CN" and family == "rate":
+        return (("Bunga China yang lebih tinggi mengurangi harapan bantuan pemerintah di sana." if up else
+                 "Bunga China yang lebih rendah memunculkan harapan permintaan, belum berarti barangnya sudah terbeli."),
+                "Ekspor Indonesia baru ikut berubah jika pabrik dan impor China benar-benar bergerak setelah ini.")
     if origin == "CN" and family == "trade":
-        return ("Headline neraca China tidak memberitahu apakah impornya kuat. Impor yang lemah buruk untuk komoditas RI "
-                "meski surplus China terlihat sehat.")
+        return (("China mungkin membeli lebih sedikit dari luar. Itu kurang baik untuk batu bara, nikel, dan sawit." if up else
+                 "China mungkin membeli lebih banyak dari luar, dan itu baik untuk barang ekspor Indonesia. Bisa juga ekspor China yang melemah."),
+                "Angka ini tidak memisahkan keduanya. Efeknya baru jelas setelah beberapa bulan.")
     if origin == "CN":
-        return "Kanal ke Indonesia berjalan lewat permintaan komoditas dan ekspor, bukan lewat keputusan BI hari ini. The Fed tidak bergeser karena data China."
-    if origin == "JP":
-        return (f"Kanal yang khas adalah biaya pinjaman yen. BI dan The Fed tidak mengubah stance hanya karena {actor}, "
-                "tetapi aset risiko bisa goyang kalau pendanaan yen menyempit atau melebar.")
-    if origin == "EU":
-        return f"Kanal globalnya adalah imbal hasil euro. The Fed tidak berpindah karena {actor}, tetapi durasi global bisa ikut. BI lebih terikat pada The Fed."
-    return f"Data {place} mengubah kondisi finansial lewat mata uang dan imbal hasil negara itu. Efek ke BI dan The Fed tidak langsung."
+        return ("Efek ke Indonesia, kalau ada, lewat permintaan China, bukan lewat keputusan BI hari ini.",
+                "The Fed tidak mengubah bunga karena data China.")
+    if origin == "JP" and family == "rate":
+        return (("Yen bisa menguat, dan orang yang minjam yen murah bisa menjual asetnya. Saham Indonesia bisa turun hari ini." if up else
+                 "Yen bisa melemah, dan pinjaman yen murah bisa hidup lagi. Saham Indonesia bisa dapat dukungan hari ini."),
+                ("BI tidak mengubah bunga karena Jepang. Efeknya baru besar jika Jepang terus menaikkan bunga." if up else
+                 "Dukungan itu hilang jika yen terlalu lemah dan Jepang terpaksa menaikkan bunga lagi."))
+    if origin == "EU" and family == "rate":
+        return (("Bunga Eropa yang lebih tinggi mengangkat euro. Rupiah hanya kena sedikit." if up else
+                 "Bunga Eropa yang lebih rendah menekan euro. Rupiah dapat ruang tipis, bukan karena BI."),
+                "BI tetap lebih mengikuti The Fed daripada bank sentral Eropa.")
+    if family in ("prices", "labor", "rate", "guidance"):
+        return ((f"Bunga di {place} yang lebih tinggi bisa menekan rupiah sedikit hari ini." if up else
+                 f"Bunga di {place} yang lebih rendah bisa memberi rupiah ruang tipis hari ini."),
+                f"Efeknya lebih kecil daripada data AS, karena yang mengubah dolar besar adalah The Fed, bukan {actor}.")
+    if family in ("growth", "activity"):
+        return (f"Efek ke rupiah kecil pada hari ini.",
+                f"BI tidak mengubah bunga karena permintaan di {place}.")
+    return (f"Efek ke rupiah kecil pada hari rilis.",
+            f"Satu angka dari {place} belum mengubah bunga BI atau The Fed.")
 
 
 def rule_analysis(ev):
     f = _facts(ev)
-    parts = [_signal(f)]
-    qual = _qualifier(f["title"], f["typ"])
-    if qual:
-        parts.append(qual)
-    bound = _bound(f)
-    if bound:
-        parts.append(bound)
-    return _clip(" ".join(parts), 1200)
+    today, limit = _today_limit(f)
+    parts = [
+        _everyday(f),
+        f"{f['title']} {f['place']} {f['actual']} ({f['paren']}).",
+    ]
+    note = _note(f["title"])
+    if note:
+        parts.append(note)
+    parts.extend((today, limit))
+    return _clip(" ".join(parts), 900)
+
+
+def _say(f, text):
+    return f"{f['title']} {f['place']}: {text}"
 
 
 def _pack(id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang):
@@ -374,732 +437,348 @@ def _pack(id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_pa
     }
 
 
-def _prefixed(f, text):
-    return f"{f['title']} {f['place']}: {text}"
-
-
-def _ensure_print(f, text):
-    text = " ".join((text or "").split())
-    title, place = f["title"], f["place"]
-    if not text:
-        text = _move(f["family"], f["kind"])
-    if (title and title not in text) or (place and place not in text):
-        text = f"{title} {place}: {text}"
-    return text
-
-
-def _move(family, kind):
-    if kind == "inline":
-        return "sesuai pembanding, jadi bukan kejutan arah"
+def _market_lines(f):
+    phrase = _dir_phrase(f)
+    origin, family, kind = f["origin"], f["family"], f["kind"]
+    actor, place = f["actor"], f["place"]
     if kind == "unknown":
-        return "tanpa konsensus atau previous, jadi arahnya belum terbaca"
+        return _pack(
+            _say(f, "belum ada perkiraan, jadi rupiah tidak dapat arah baru hari ini."),
+            _say(f, "BI tidak mengubah bunga sebelum ada angka pembanding."),
+            _say(f, "pasar AS tidak mengubah harga selama kejutannya belum terukur."),
+            _say(f, "The Fed juga belum dapat arah baru."),
+            _say(f, "pasar dunia tidak bergerak besar tanpa kejutan yang jelas."),
+            _say(f, "satu angka tanpa pembanding belum mengubah apa-apa."),
+        )
+    if kind == "inline":
+        return _pack(
+            _say(f, "pas dengan perkiraan, jadi rupiah tidak dapat dorongan baru hari ini."),
+            _say(f, "bunga tidak berubah hanya karena angkanya sesuai."),
+            _say(f, "sudah diduga, jadi saham dan surat utang AS tidak perlu diubah hari ini."),
+            _say(f, "The Fed tidak dapat alasan baru untuk mengubah bunga."),
+            _say(f, "tidak menggerakkan dolar hari ini."),
+            _say(f, "yang tetap berlaku adalah angkanya sendiri, bukan kejutan."),
+        )
     up = kind == "hot"
-    return {
-        "rate": "bunganya lebih ketat dari yang dihargai" if up else "bunganya lebih longgar dari yang dihargai",
-        "prices": "tekanan harganya lebih panas dari yang dihargai" if up else "tekanan harganya lebih dingin dari yang dihargai",
-        "labor": "pasar kerjanya lebih ketat dari yang dihargai" if up else "pasar kerjanya lebih longgar dari yang dihargai",
-        "growth": "permintaannya lebih kuat dari yang dihargai" if up else "permintaannya lebih lemah dari yang dihargai",
-        "activity": "momentum bulanannya lebih kuat dari yang dihargai" if up else "momentum bulanannya lebih lemah dari yang dihargai",
-        "trade": "neraca eksternalnya lebih kuat dari yang dihargai" if up else "neraca eksternalnya lebih lemah dari yang dihargai",
-        "reserves": "stok devisanya naik dibanding pembanding" if up else "stok devisanya turun dibanding pembanding",
-        "guidance": "nadanya lebih keras dari yang dihargai" if up else "nadanya lebih lunak dari yang dihargai",
-    }.get(family, "lebih kuat dari yang dihargai" if up else "lebih lemah dari yang dihargai")
-
-
-def _price_cause(f, tight):
-    t = f["title"].lower()
-    if any(k in t for k in ("hourly", "wage", "earnings")):
-        return "biaya upah masih menekan" if tight else "tekanan upah mereda"
-    if "ppi" in t or "producer" in t:
-        return ("harga produsen masih tinggi dan biasanya mendahului harga konsumen" if tight else
-                "harga produsen mendingin, sering mendahului harga konsumen")
-    if "pce" in t:
-        return ("ukuran harga yang ditimbang The Fed masih panas" if tight else
-                "ukuran harga yang ditimbang The Fed mendingin")
-    if "core" in t or "inti" in t:
-        return "inflasi inti belum turun" if tight else "inflasi inti turun, bukan cuma harga pangan atau energi"
-    return "tekanan harga belum reda" if tight else "disinflasi berlanjut"
-
-
-def _labor_cause(f, tight):
-    t = f["title"].lower()
-    if "jobless" in t or "claims" in t:
-        return ("klaim mingguan menunjukkan pasar kerja masih ketat" if tight else
-                "klaim mingguan menunjukkan kelonggaran, meski angkanya berisik")
-    if "adp" in t:
-        return ("perekrutan swasta ADP masih kuat, bobotnya di bawah payroll resmi" if tight else
-                "perekrutan swasta ADP melemah, bobotnya di bawah payroll resmi")
-    if any(k in t for k in ("payroll", "nonfarm", "non-farm", "non farm")):
-        return "laju perekrutan masih kuat" if tight else "laju perekrutan melemah"
-    return ("tingkat pengangguran menunjukkan pasar kerja yang masih ketat" if tight else
-            "tingkat pengangguran menunjukkan kelonggaran tenaga kerja")
-
-
-def _us_conditions(f, cause, tight, long_id, long_us, long_gl, us_tail):
-    pre = f"{f['title']} {f['place']}"
-    if tight:
-        id_s = f"{pre}: {cause}. Dolar dan imbal hasil AS naik di hari rilis, sehingga rupiah dan harga SBN melemah pada sesi yang sama."
-        us_s = f"{pre}: {cause}. Fed funds dan UST 2 tahun dihargai lebih tinggi hari itu. {us_tail}"
-        gl_s = f"{pre}: {cause}. Dolar naik terhadap mata uang utama dan EM pada sesi rilis."
-    else:
-        id_s = f"{pre}: {cause}. Dolar dan imbal hasil AS turun di hari rilis, sehingga rupiah dan harga SBN mendapat ruang pada sesi yang sama."
-        us_s = f"{pre}: {cause}. Fed funds dan UST 2 tahun dihargai lebih rendah hari itu. {us_tail}"
-        gl_s = f"{pre}: {cause}. Dolar melemah; emas dan mata uang EM menguat pada sesi yang sama."
-    return _pack(id_s, long_id, us_s, long_us, gl_s, long_gl)
-
-
-def _lines_us(f):
-    family, tight = f["family"], f["kind"] == "hot"
-    title, place = f["title"], f["place"]
-    pre = f"{title} {place}"
-    if family == "prices":
-        cause = _price_cause(f, tight)
-        if tight:
-            return _us_conditions(
-                f, cause, True,
-                f"{pre}: selama harga ini belum mendingin, The Fed menahan bunga lebih lama dan BI kehilangan ruang memotong lebih dulu.",
-                f"{pre}: satu cetakan belum membatalkan disinflasi, tetapi rangkaian yang panas membuat jalur pemangkasan Fed lebih dangkal.",
-                f"{pre}: kalau tekanan harga bertahan, selisih imbal hasil AS terhadap negara lain melebar dan modal condong ke aset dolar.",
-                "Saham AS yang durasinya panjang paling sensitif terhadap imbal hasil riil.",
-            )
-        return _us_conditions(
-            f, cause, False,
-            f"{pre}: disinflasi yang berlanjut membuka ruang BI, karena tekanan dolar dan imbal hasil mereda.",
-            f"{pre}: The Fed baru benar-benar melonggar jika pendinginan ini bertahan, bukan karena satu bulan.",
-            f"{pre}: selisih imbal hasil AS menyempit jika disinflasi berlanjut, dan arus ke EM menjadi lebih murah.",
-            "Saham AS berdurasi panjang yang paling lega.",
+    if origin == "US" and family == "labor":
+        return _pack(
+            _say(f, f"{phrase}. Dolar biasanya {'naik' if up else 'turun'} hari ini, jadi rupiah bisa {'melemah' if up else 'sedikit naik'}."),
+            _say(f, "BI tidak mengubah bunga karena satu laporan kerja AS." if up else
+                  "BI baru punya alasan menurunkan bunga jika laporan kerja AS yang lemah ini berulang."),
+            _say(f, f"{phrase}. Bunga pinjaman jangka pendek AS bisa {'naik' if up else 'turun'} hari ini."),
+            _say(f, "The Fed tidak menaikkan bunga hanya karena satu bulan orang lebih mudah dapat kerja." if up else
+                  "The Fed baru mempertimbangkan bunga lebih rendah jika orang makin susah dapat kerja beberapa bulan."),
+            _say(f, f"{phrase}. Dolar biasanya {'menguat' if up else 'melemah'} terhadap mata uang lain hari ini."),
+            _say(f, "Perdagangan dunia tidak berubah dari satu laporan kerja." if up else
+                  "Satu laporan yang lemah belum berarti ekonomi dunia melambat."),
         )
-    if family == "labor":
-        cause = _labor_cause(f, tight)
-        if tight:
-            return _us_conditions(
-                f, cause, True,
-                f"{pre}: pasar kerja yang tetap ketat menahan upah, jadi BI juga kehilangan ruang memotong lebih dulu lewat kanal valas.",
-                f"{pre}: selama kelonggaran tenaga kerja belum muncul, pemangkasan Fed tetap dangkal meski inflasi barang melambat.",
-                f"{pre}: siklus global tidak longgar serempak kalau tenaga kerja AS tetap ketat. Imbal hasil AS tetap menjadi jangkar.",
-                "Kanalnya upah dan perekrutan, bukan harga barang.",
-            )
-        return _us_conditions(
-            f, cause, False,
-            f"{pre}: kelonggaran tenaga kerja AS meredakan tekanan dolar, dan ruang BI untuk lebih longgar ikut terbuka.",
-            f"{pre}: The Fed baru menggeser siklus jika kelonggaran ini terlihat lagi, bukan dari satu laporan.",
-            f"{pre}: imbal hasil AS yang lebih rendah, kalau bertahan, membuat pendanaan EM lebih murah.",
-            "Kanalnya kelonggaran tenaga kerja, bukan kejutan harga barang.",
+    if origin == "US" and family == "prices":
+        return _pack(
+            _say(f, f"{phrase}. Dolar biasanya {'naik' if up else 'turun'} hari ini, jadi rupiah bisa {'melemah' if up else 'sedikit naik'}."),
+            _say(f, "BI kehilangan ruang menurunkan bunga selama harga di AS tetap naik cepat." if up else
+                  "BI dapat ruang menurunkan bunga jika harga di AS terus lebih tenang."),
+            _say(f, f"bunga pinjaman jangka pendek AS bisa {'naik' if up else 'turun'} hari ini. Saham yang sensitif bunga paling terasa."),
+            _say(f, "The Fed lebih sulit menurunkan bunga selama harga belum mendingin." if up else
+                  "The Fed baru menurunkan bunga jika harga yang lebih tenang ini bertahan, bukan karena satu bulan."),
+            _say(f, f"dolar biasanya {'menguat' if up else 'melemah'} hari ini."),
+            _say(f, "kalau harga AS tetap naik cepat, orang lebih suka menaruh uang di aset dolar." if up else
+                  "kalau harga AS terus mendingin, biaya pinjaman di luar AS bisa ikut lebih murah."),
         )
+    if origin == "US" and family == "rate":
+        return _pack(
+            _say(f, f"{phrase}. Rupiah {'tertekan' if up else 'bisa sedikit lega'} hari ini karena dolar {'menguat' if up else 'melemah'}."),
+            _say(f, "BI sulit menurunkan bunga lebih dulu tanpa menekan rupiah." if up else
+                  "BI dapat ruang menurunkan bunga, selama rupiah tidak melemah karena hal lain."),
+            _say(f, "bunga pinjaman jangka pendek AS langsung berubah pada hari keputusan."),
+            _say(f, "ini perubahan harga uang sekarang, bukan angka yang masih menunggu perbaikan data."),
+            _say(f, f"dolar {'menguat' if up else 'melemah'} dan pinjaman global jadi {'lebih mahal' if up else 'lebih murah'} hari ini."),
+            _say(f, "efeknya bertahan jika The Fed tidak membatalkan keputusan ini pada rapat berikut."),
+        )
+    if origin == "US" and family == "guidance":
+        return _pack(
+            _say(f, f"{phrase}. Dolar bisa {'naik' if up else 'turun'} hari ini, dan rupiah ikut."),
+            _say(f, "BI tidak mengubah bunga hanya karena kata-kata The Fed. Data harga dan kerja berikutnya yang menentukan."),
+            _say(f, "bunga pinjaman jangka pendek AS bisa bergerak hari ini karena kalimat itu."),
+            _say(f, "satu pernyataan belum mengubah bunga. Angka harga dan lapangan kerja tetap yang menguji."),
+            _say(f, f"dolar bisa {'menguat' if up else 'melemah'} hari ini karena orang membaca nada The Fed."),
+            _say(f, "pasar dunia baru menganggapnya serius jika The Fed mengulanginya, bukan dari satu teks."),
+        )
+    if origin == "US" and family == "growth":
+        return _pack(
+            _say(f, f"{phrase}. Rupiah hari ini biasanya ikut dolar, yang bisa {'tetap kuat' if up else 'melemah'}."),
+            _say(f, "ekspor Indonesia ke AS lebih tertolong, tapi biaya pinjaman global tidak cepat turun." if up else
+                  "pasar ekspor ke AS menyusut, sementara ruang BI menurunkan bunga baru terbuka kalau dolar benar-benar turun."),
+            _say(f, "saham bisnis harian AS dapat dukungan, sementara bunga jangka pendek bisa naik." if up else
+                  "saham bisnis harian AS kehilangan dukungan, sementara bunga jangka pendek bisa turun."),
+            _say(f, "satu kuartal masih bisa diperbaiki. The Fed kurang alasan menurunkan bunga jika pertumbuhan bertahan." if up else
+                  "kalau ini berlanjut, ekonomi lebih pelan dan bunga bisa lebih rendah. Keduanya perlu kuartal berikutnya."),
+            _say(f, "minat beli di pasar dunia naik, tapi dolar tidak otomatis melemah." if up else
+                  "minat beli di pasar dunia turun pada hari rilis."),
+            _say(f, "perdagangan dunia lebih tertolong oleh permintaan AS yang kuat." if up else
+                  "perdagangan dunia kehilangan permintaan AS. Bunga The Fed yang lebih rendah, kalau ada, baru terasa belakangan."),
+        )
+    if origin == "US" and family == "activity":
+        return _pack(
+            _say(f, f"{phrase}. Ini satu bulan, bukan ukuran ekonomi setahun. Rupiah bisa {'tertekan' if up else 'sedikit lega'} hari ini."),
+            _say(f, "The Fed dan BI baru mengubah bunga jika survei yang searah ini bertahan beberapa bulan."),
+            _say(f, "saham bisnis harian AS bisa bergerak hari ini, lalu mudah balik bulan depan."),
+            _say(f, "The Fed tidak mengubah bunga karena satu bulan. Yang dilihat adalah harga dan lapangan kerja."),
+            _say(f, "pasar dunia bergerak tipis. Ini bukan keputusan bunga."),
+            _say(f, "perdagangan dunia tidak berubah sebelum angka ini terlihat di pertumbuhan dan harga."),
+        )
+    if origin == "US" and family == "trade":
+        return _pack(
+            _say(f, f"{phrase}. Efeknya ke rupiah kecil."),
+            _say(f, "neraca dagang AS tidak mengubah ruang BI."),
+            _say(f, "The Fed tidak mengubah bunga karena neraca dagang. Saham dan surat utang AS tidak punya alasan besar untuk berubah."),
+            _say(f, "angka ini mencerminkan perdagangan yang sudah terjadi, bukan keputusan bunga yang baru."),
+            _say(f, "arus dagang tidak berbalik pada hari rilis."),
+            _say(f, "angka ini tidak memberitahu apakah yang berubah harga barang atau jumlah barang."),
+        )
+    if origin == "US" and family == "reserves":
+        return _pack(
+            _say(f, "cadangan devisa AS tidak menggerakkan rupiah hari ini."),
+            _say(f, "angka ini tidak mengubah ruang BI dan bukan permintaan untuk ekspor Indonesia."),
+            _say(f, "bunga AS tidak berubah karena cadangan devisa."),
+            _say(f, "The Fed tidak memakai angka cadangan untuk menentukan bunga."),
+            _say(f, "dolar tidak berbalik karena perubahan cadangan AS."),
+            _say(f, "uang beredar di dunia tidak berubah hanya karena satu catatan cadangan."),
+        )
+    if origin == "ID":
+        return _id_lines(f, phrase, up)
+    if origin == "CN":
+        return _cn_lines(f, phrase, up)
+    if origin == "JP" and family == "rate":
+        return _pack(
+            _say(f, f"{phrase}. Yen bisa {'menguat' if up else 'melemah'}, dan saham Indonesia bisa {'turun' if up else 'dapat dukungan'} hari ini."),
+            _say(f, "BI tidak mengubah bunga karena Jepang." if up else
+                  "dukungan itu hilang jika yen terlalu lemah dan Jepang terpaksa menaikkan bunga lagi."),
+            _say(f, "The Fed tidak ikut mengubah bunga. Surat utang AS paling kena lewat orang yang menutup pinjaman yen."),
+            _say(f, "efek ke AS kecil. Yang panjang adalah apakah pinjaman yen murah terus menyempit." if up else
+                  "jalur bunga AS tidak mengikuti Jepang."),
+            _say(f, f"yen {'menguat' if up else 'melemah'} pada hari keputusan."),
+            _say(f, "efeknya baru besar jika Jepang mengulang keputusan ini, bukan pada satu rapat."),
+        )
+    if origin == "EU" and family == "rate":
+        return _pack(
+            _say(f, f"{phrase}. Rupiah hanya kena sedikit, jauh lebih kecil daripada keputusan The Fed."),
+            _say(f, "BI tetap lebih mengikuti The Fed daripada bank sentral Eropa."),
+            _say(f, "The Fed tidak mengubah bunga hanya karena Eropa."),
+            _say(f, "yang terasa di AS cuma bunga surat utang yang bergerak bareng, dan itu kecil."),
+            _say(f, f"euro {'menguat' if up else 'melemah'} pada hari keputusan."),
+            _say(f, "ini belum berarti bunga di seluruh negara maju bergerak bareng, selama The Fed belum ikut."),
+        )
+    return _other_lines(f, phrase, up)
+
+
+def _id_lines(f, phrase, up):
+    family = f["family"]
     if family == "rate":
-        cause = ("keputusan bunga lebih ketat dari harga yang sudah terpasang" if tight else
-                 "keputusan bunga lebih longgar dari harga yang sudah terpasang")
-        if tight:
-            return _us_conditions(
-                f, cause, True,
-                f"{pre}: stance The Fed yang lebih tinggi menahan selisih bunga. BI tidak bisa jauh lebih longgar tanpa menekan rupiah.",
-                f"{pre}: jalur bunga AS sudah bergeser. Ini perubahan harga uang, bukan data yang masih menunggu revisi.",
-                f"{pre}: kondisi finansial global lebih ketat selama selisih bunga AS lebar. Arus ke EM, termasuk Indonesia, lebih mahal.",
-                "Yang bergerak lebih dulu adalah kurva pendek, sebelum data bulan depan.",
-            )
-        return _us_conditions(
-            f, cause, False,
-            f"{pre}: pelonggaran Fed yang lebih dalam memberi BI ruang, selama rupiah tidak dipakai untuk alasan lain.",
-            f"{pre}: jalur bunga AS turun pada keputusan itu sendiri. Data bulan depan menguji, bukan menggantikan, pergeseran ini.",
-            f"{pre}: selisih bunga AS yang menyempit membuat pendanaan global lebih murah jika keputusan ini tidak dibatalkan pertemuan berikut.",
-            "Kurva pendek direvisi pada hari keputusan, bukan menunggu CPI berikutnya.",
-        )
-    if family == "guidance":
-        cause = ("nada komunikasi lebih keras, tanpa data aktivitas baru" if tight else
-                 "nada komunikasi lebih lunak, tanpa data aktivitas baru")
-        if tight:
-            return _us_conditions(
-                f, cause, True,
-                f"{pre}: nada yang lebih keras hanya menahan BI jika rilis harga dan tenaga kerja berikutnya tidak membantahnya.",
-                f"{pre}: komunikasi mengubah harga Fed funds sekarang, tetapi siklusnya batal jika data berikutnya lebih dingin.",
-                f"{pre}: dolar global mengikuti narasi The Fed pada hari ini. Siklusnya baru berubah jika nada ini diulang.",
-                "Ini kanal narasi, bukan kanal data baru.",
-            )
-        return _us_conditions(
-            f, cause, False,
-            f"{pre}: nada yang lebih lunak memberi ruang ke rupiah hanya jika data berikutnya tidak memaksa The Fed berbalik.",
-            f"{pre}: satu komunikasi yang lunak belum memindahkan siklus. Data harga dan tenaga kerja tetap wasitnya.",
-            f"{pre}: pelonggaran global yang mengikuti narasi ini baru nyata jika The Fed mengulanginya, bukan dari satu teks.",
-            "Ini kanal narasi. Data berikutnya masih bisa membatalkannya.",
-        )
-    return _lines_spillover(f)
-
-
-def _lines_growth_us(f):
-    if f["kind"] == "hot":
         return _pack(
-            _prefixed(f, "dua sinyal berjalan bersamaan hari ini. Permintaan global lebih sehat, tetapi dolar bisa tetap kuat karena The Fed punya lebih sedikit alasan untuk memotong. Rupiah biasanya mengikuti kanal dolar pada sesi pertama."),
-            _prefixed(f, "ekspor RI ke AS lebih tertolong, tetapi biaya dana global tidak cepat turun. BI menghadapi permintaan yang lebih baik dan selisih bunga yang tetap lebar."),
-            _prefixed(f, "saham siklikal AS dapat dukungan pertumbuhan, sementara imbal hasil jangka pendek naik karena pemangkasan Fed mundur. Dua harga itu bisa bergerak berlawanan pada hari yang sama."),
-            _prefixed(f, "pertumbuhan yang bertahan tanpa pemotongan bunga yang dalam menjadi lebih mungkin. Satu kuartal masih bisa direvisi."),
-            _prefixed(f, "selera risiko global naik, tetapi dolar tidak otomatis melemah. Komoditas siklikal dapat dukungan permintaan."),
-            _prefixed(f, "perdagangan dunia lebih tertolong oleh permintaan AS yang kuat daripada oleh pelonggaran The Fed yang tertunda."),
-        )
-    return _pack(
-        _prefixed(f, "permintaan yang lebih lemah menekan selera risiko hari ini, tetapi membuka peluang The Fed lebih longgar. Rupiah bisa tertekan dulu, lalu lega kalau dolar melemah."),
-        _prefixed(f, "pasar ekspor RI ke AS menyusut, sementara ruang BI memotong baru terbuka kalau dolar benar-benar turun."),
-        _prefixed(f, "saham siklikal AS kehilangan dukungan, sementara imbal hasil AS turun karena pasar menambah peluang pelonggaran Fed."),
-        _prefixed(f, "siklus bergeser ke pertumbuhan lebih rendah dan jalur bunga lebih rendah. Keduanya perlu kuartal berikutnya, karena GDP sering direvisi."),
-        _prefixed(f, "aset risiko global melemah pada hari rilis. Dolar bisa ikut melemah kalau kanal Fed mengalahkan kanal penghindaran risiko."),
-        _prefixed(f, "perdagangan dunia kehilangan permintaan AS. Pelonggaran Fed, kalau menyusul, baru terasa setelah beberapa pertemuan."),
-    )
-
-
-def _lines_activity_us(f):
-    if f["kind"] == "hot":
-        return _pack(
-            _prefixed(f, "ini momentum bulanan, bukan GDP. Dolar dan imbal hasil bisa naik hari ini dan rupiah menanggungnya, tetapi BI tidak mengubah bunga karena satu survei."),
-            _prefixed(f, "The Fed dan BI baru menggeser siklus jika momentum ini bertahan beberapa bulan."),
-            _prefixed(f, "harga Fed funds hanya bergeser di margin. Saham siklikal AS bereaksi, lalu mudah balik bulan depan."),
-            _prefixed(f, "stance The Fed tidak berpindah karena satu bulan aktivitas. Yang diuji adalah apakah ini mengonfirmasi inflasi dan tenaga kerja."),
-            _prefixed(f, "selera risiko global bergerak tipis. Ini bukan keputusan bunga."),
-            _prefixed(f, "siklus global tidak berbelok sebelum momentum ini terlihat di pertumbuhan dan harga."),
-        )
-    return _pack(
-        _prefixed(f, "momentum bulanan melemah. Dolar bisa sedikit turun hari ini, tetapi satu bulan yang lemah belum memberi BI ruang memotong."),
-        _prefixed(f, "siklus belum berbalik. Perlu beberapa survei searah sebelum The Fed atau BI menganggap permintaan AS benar-benar melambat."),
-        _prefixed(f, "saham siklikal AS tertekan tipis dan imbal hasil bisa turun di margin, mudah terhapus rilis berikutnya."),
-        _prefixed(f, "jalur Fed tidak pindah karena satu bulan aktivitas yang lemah."),
-        _prefixed(f, "tidak ada perubahan rezim dolar. Pergerakan global hari ini kecil."),
-        _prefixed(f, "perdagangan dunia tidak kehilangan permintaan AS sebelum kelemahan ini masuk ke GDP."),
-    )
-
-
-def _lines_trade_us(f):
-    if f["kind"] == "hot":
-        return _pack(
-            _prefixed(f, "neraca yang lebih kuat hanya sedikit menambah dukungan dolar lewat arus, bukan lewat The Fed. Rupiah hampir tidak bergerak."),
-            _prefixed(f, "neraca dagang AS tidak mengubah ruang BI. Efek jangka panjangnya kecil dibanding inflasi, tenaga kerja, atau keputusan bunga."),
-            _prefixed(f, "ini bukan input reaksi The Fed. UST dan saham AS tidak punya alasan besar untuk dihargai ulang."),
-            _prefixed(f, "surplus atau defisit dagang AS mencerminkan permintaan dan dolar yang sudah terjadi, bukan tuas kebijakan baru."),
-            _prefixed(f, "arus perdagangan tidak berbalik pada hari rilis. Pergerakan valas, kalau ada, kecil."),
-            _prefixed(f, "komposisi harga versus volume tidak ada di angka ini, jadi ini bukan sinyal komoditas."),
-        )
-    return _pack(
-        _prefixed(f, "neraca yang lebih lemah sedikit mengurangi dukungan dolar lewat arus. Bukan alasan rupiah bergerak besar."),
-        _prefixed(f, "BI tidak mendapat ruang baru dari neraca dagang AS."),
-        _prefixed(f, "The Fed tidak melonggar karena neraca dagang. UST tidak harus dihargai ulang."),
-        _prefixed(f, "defisit yang melebar biasanya cermin dolar dan permintaan AS yang sudah kuat, bukan perubahan mandat Fed."),
-        _prefixed(f, "tidak ada rezim valas baru pada hari rilis."),
-        _prefixed(f, "pelebaran defisit bukan kejutan komoditas. Komposisinya tidak ada di headline."),
-    )
-
-
-def _lines_reserves_us(f):
-    return _pack(
-        _prefixed(f, "cadangan devisa AS bukan alat The Fed. Tidak ada alasan rupiah bergerak besar pada hari rilis ini."),
-        _prefixed(f, "stok devisa AS tidak mengubah ruang BI dan bukan permintaan untuk ekspor Indonesia."),
-        _prefixed(f, "Fed funds dan UST tidak dihargai ulang oleh cadangan devisa."),
-        _prefixed(f, "siklus bunga AS tidak memakai angka cadangan sebagai input."),
-        _prefixed(f, "dolar global tidak berbelok karena perubahan stok devisa AS."),
-        _prefixed(f, "likuiditas dunia tidak berubah hanya karena satu catatan cadangan."),
-    )
-
-
-def _id_pack(f, id_s, id_l, us_s, gl_s, gl_l):
-    pre = f"{f['title']} {f['place']}"
-    return _pack(
-        f"{pre}: {id_s}",
-        f"{pre}: {id_l}",
-        f"{pre}: {us_s}",
-        f"{pre}: jalur bunga AS tidak bergeser. The Fed tidak memakai data Indonesia sebagai input.",
-        f"{pre}: {gl_s}",
-        f"{pre}: {gl_l}",
-    )
-
-
-def _lines_id(f):
-    family, up = f["family"], f["kind"] == "hot"
-    if family == "rate" and up:
-        return _id_pack(
-            f,
-            "bunga lebih ketat menopang rupiah lewat selisih bunga pada hari yang sama. Saham properti tertekan; bank dapat margin tetapi volume kredit lebih berat.",
-            "stance BI yang lebih tinggi menahan kredit dan valuasi durasi domestik sampai inflasi atau rupiah mengizinkan pelonggaran.",
-            "Fed funds tidak direvisi. Keputusan BI bukan data The Fed.",
-            "dampaknya lokal. Mata uang EM lain tidak otomatis ikut menguat.",
-            "baru relevan secara global jika ini bagian dari pengetatan EM yang lebih luas, bukan sebagai penggerak dolar.",
-        )
-    if family == "rate":
-        return _id_pack(
-            f,
-            "bunga lebih longgar menekan rupiah karena selisih bunga menyempit, dan menolong saham yang sensitif bunga pada hari yang sama.",
-            "siklus kredit domestik lebih longgar, dengan batas stabilitas rupiah. BI tidak bisa jauh di bawah The Fed tanpa menekan valas.",
-            "tidak ada revisi Fed funds pada hari keputusan BI.",
-            "dolar global tidak berbelok. Yang bergerak adalah rupiah terhadap dolar.",
-            "arus ke Indonesia menjadi lebih murah hanya jika pelonggaran ini tidak membuat pelemahan rupiah yang menetap.",
-        )
-    if family == "prices" and up:
-        return _id_pack(
-            f,
-            "harga yang lebih panas membuat pasar mengharapkan BI lebih ketat. Harga SBN tertekan hari itu dan saham konsumen ikut; rupiah bisa tertahan kalau respons BI dianggap kredibel.",
-            "daya beli dan ruang pemangkasan BI sama-sama menyempit selama inflasi ini tinggal di atas sasaran.",
-            "inflasi Indonesia tidak masuk mandat The Fed, jadi UST tidak dihargai ulang hari ini.",
-            "harga global tidak berpindah. Efeknya di kurva domestik.",
-            "baru menjadi cerita global jika inflasi EM secara bersama menahan bank sentral EM untuk tidak memotong.",
+            _say(f, f"{phrase}. Rupiah {'dapat dukungan' if up else 'bisa melemah'} hari ini, dan pinjaman jadi {'lebih mahal' if up else 'lebih murah'}."),
+            _say(f, "kredit lebih berat selama bunga tetap tinggi." if up else
+                  "BI tidak bisa menurunkan bunga jauh di bawah The Fed tanpa menekan rupiah."),
+            _say(f, "pasar AS tidak mengubah bunga karena keputusan BI."),
+            _say(f, "The Fed tidak memakai angka Indonesia."),
+            _say(f, "mata uang lain tidak otomatis ikut."),
+            _say(f, "efeknya ada di Indonesia, bukan di dolar dunia."),
         )
     if family == "prices":
-        return _id_pack(
-            f,
-            "harga yang lebih dingin membuka harapan BI lebih longgar. SBN dan saham sensitif bunga dapat dukungan; rupiah aman hanya kalau selisih bunga tidak kolaps.",
-            "ruang pemangkasan BI melebar selama kejutan dingin ini bukan sekali cetak.",
-            "The Fed tidak membaca inflasi Indonesia. Tidak ada kanal ke UST hari ini.",
-            "tidak ada impuls dolar global. Pergerakannya di aset rupiah.",
-            "siklus harga dunia tidak berbelok karena inflasi Indonesia semata.",
-        )
-    if family == "labor" and up:
-        return _id_pack(
-            f,
-            "pasar kerja yang lebih ketat menopang konsumsi domestik. BI kurang alasan memotong, dan rupiah tidak otomatis menguat hanya karena data tenaga kerja.",
-            "upah yang bertahan menahan pelonggaran BI, tetapi ini bukan kejutan valas sebesar keputusan bunga.",
-            "tenaga kerja Indonesia tidak menggeser payroll atau Fed funds.",
-            "pasar kerja Indonesia tidak menggerakkan dolar.",
-            "kontribusinya ke siklus global kecil. Yang diubah adalah permintaan domestik.",
+        return _pack(
+            _say(f, f"{phrase}. Harga surat utang Indonesia bisa {'turun' if up else 'naik'} hari ini."),
+            _say(f, "daya beli menyempit selama harga tetap naik cepat." if up else
+                  "ruang BI menurunkan bunga melebar jika ini bukan cuma sekali."),
+            _say(f, "harga Indonesia tidak mengubah bunga The Fed."),
+            _say(f, "pasar AS tidak merevisi bunga karena inflasi Indonesia."),
+            _say(f, "harga dunia tidak berpindah karena angka ini."),
+            _say(f, "ini cerita dalam negeri, bukan harga barang dunia."),
         )
     if family == "labor":
-        return _id_pack(
-            f,
-            "kelonggaran tenaga kerja menekan cerita konsumsi. Rupiah bisa ikut lemah jika pasar membaca pertumbuhan yang melambat, bukan karena The Fed.",
-            "BI lebih punya alasan melonggar jika kelonggaran ini bertahan, dengan risiko rupiah kalau pertumbuhan menjadi cerita utamanya.",
-            "tidak ada revisi pasar tenaga kerja AS.",
-            "dolar tidak berbelok karena pengangguran Indonesia.",
-            "siklus global tidak ditentukan oleh pasar kerja Indonesia.",
-        )
-    if family == "growth" and up:
-        return _id_pack(
-            f,
-            "pertumbuhan yang lebih kuat menolong IHSG dan kepercayaan ke rupiah pada hari rilis, lewat ekonomi domestik bukan lewat The Fed.",
-            "siklus laba dan kredit lebih sehat. BI kurang terdesak menstimulus, jadi pelonggaran tidak otomatis menyusul pertumbuhan yang kuat.",
-            "GDP Indonesia tidak menggeser saham AS atau UST hari ini.",
-            "selera risiko global hampir tidak bergerak. Indonesia penerima harga komoditas, bukan penentu siklus dunia pada satu rilis.",
-            "kontribusi ke perdagangan dunia lewat impor Indonesia, dan itu baru berarti jika bertahan beberapa kuartal.",
+        return _pack(
+            _say(f, f"{phrase}. Belanja di dalam negeri {'lebih tertolong' if up else 'bisa melemah'}."),
+            _say(f, "BI kurang alasan menurunkan bunga jika lowongan tetap banyak." if up else
+                  "BI baru menurunkan bunga jika ini berulang, dan tetap menjaga rupiah."),
+            _say(f, "lapangan kerja Indonesia tidak mengubah laporan kerja AS."),
+            _say(f, "The Fed tidak memakai angka ini."),
+            _say(f, "dolar tidak berbalik karena pengangguran Indonesia."),
+            _say(f, "yang berubah adalah belanja di dalam negeri, bukan perdagangan dunia."),
         )
     if family == "growth":
-        return _id_pack(
-            f,
-            "pertumbuhan yang lebih lemah menekan IHSG dan membuat rupiah lebih rentan pada hari rilis.",
-            "tekanan agar BI atau pemerintah menstimulus naik, tetapi stimulus yang terlalu longgar bisa menekan rupiah lagi.",
-            "perlambatan Indonesia tidak merevisi The Fed.",
-            "permintaan impor Indonesia yang lebih lemah adalah kanal globalnya, kecil pada satu kuartal.",
-            "siklus dunia tidak berbalik karena satu GDP Indonesia.",
-        )
-    if family == "activity" and up:
-        return _id_pack(
-            f,
-            "ini momentum bulanan, bukan reset siklus. Konsumsi domestik terlihat lebih kuat hari ini; BI belum harus mengubah bunga.",
-            "BI baru menggeser stance jika momentum ini bertahan beberapa bulan, bukan karena satu survei.",
-            "survei aktivitas Indonesia tidak masuk harga Fed funds.",
-            "satu PMI atau ritel Indonesia tidak menggerakkan harga global.",
-            "baru berarti secara global jika kemudian terlihat di GDP dan impor.",
+        return _pack(
+            _say(f, f"{phrase}. Saham Indonesia dan rupiah {'dapat dukungan' if up else 'lebih rentan'} hari ini."),
+            _say(f, "BI kurang terdesak menurunkan bunga jika ekonomi sudah kuat." if up else
+                  "dorongan agar BI menurunkan bunga naik, tapi penurunan yang terlalu besar bisa menekan rupiah lagi."),
+            _say(f, "pertumbuhan Indonesia tidak mengubah saham atau surat utang AS hari ini."),
+            _say(f, "The Fed tidak merevisi bunga karena GDP Indonesia."),
+            _say(f, "pasar dunia hampir tidak bergerak."),
+            _say(f, "kontribusinya ke perdagangan dunia baru terasa jika ini bertahan beberapa kuartal."),
         )
     if family == "activity":
-        return _id_pack(
-            f,
-            "momentum bulanan melemah. Konsumsi domestik terlihat lebih lemah hari ini, tanpa mengubah bunga BI serta-merta.",
-            "satu survei yang lemah belum memaksa stimulus. BI menunggu apakah ini masuk ke pertumbuhan.",
-            "survei Indonesia tidak merevisi pasar AS.",
-            "harga global tidak bergerak karena satu survei aktivitas Indonesia.",
-            "dunia baru kena jika kelemahan ini menekan impor Indonesia selama beberapa kuartal.",
-        )
-    if family == "trade" and up:
-        return _id_pack(
-            f,
-            "neraca yang lebih kuat menambah pasokan valas, jadi rupiah dapat dukungan pada hari rilis. Bunga BI tidak otomatis berubah.",
-            "bantalan eksternal yang lebih tebal mengurangi kebutuhan BI membakar cadangan. Angka agregat tidak memberitahu apakah sumbernya harga atau volume.",
-            "neraca dagang Indonesia tidak menggeser The Fed.",
-            "satu neraca tidak membalik harga komoditas global. Yang bergerak hari ini adalah rupiah.",
-            "kalau kekuatannya dari harga komoditas, bukan volume, komposisi itu tidak tertulis di angka agregat.",
+        return _pack(
+            _say(f, f"{phrase}. Ini satu bulan, bukan ukuran ekonomi setahun. BI tidak mengubah bunga hari ini."),
+            _say(f, "BI baru mengubah bunga jika survei yang searah ini berulang."),
+            _say(f, "survei Indonesia tidak masuk harga bunga AS."),
+            _say(f, "The Fed tidak memakai survei ini."),
+            _say(f, "satu survei Indonesia tidak menggerakkan harga dunia."),
+            _say(f, "baru berarti di luar negeri jika kemudian terlihat di pertumbuhan dan impor."),
         )
     if family == "trade":
-        return _id_pack(
-            f,
-            "neraca yang lebih lemah menipiskan pasokan valas. Rupiah lebih rentan pada hari rilis, dan BI bisa lebih berat menjaga mata uang.",
-            "dukungan eksternal menipis. Tanpa komposisi harga versus volume, belum ketahuan apakah permintaan dunia atau harga komoditas yang melemah.",
-            "The Fed tidak bergerak karena neraca dagang Indonesia.",
-            "harga komoditas global tidak ditentukan oleh satu neraca Indonesia.",
-            "kalau kelemahannya dari volume ekspor, permintaan dunia yang lesu baru terlihat setelah beberapa bulan, bukan hari ini.",
-        )
-    if family == "reserves" and up:
-        return _id_pack(
-            f,
-            "stok devisa yang naik menebalkan amunisi BI menjaga rupiah. Ini bukan sinyal pertumbuhan, dan tidak harus mengangkat IHSG hari itu.",
-            "bantalan yang lebih tebal memperpanjang kemampuan stabilisasi. Itu stok, bukan permintaan baru.",
-            "cadangan devisa Indonesia tidak masuk reaksi The Fed.",
-            "pasar global tidak dihargai ulang. Efeknya pada kredibilitas pertahanan rupiah.",
-            "stok ini relevan secara global hanya jika pasar menilai Indonesia lebih tahan terhadap penguatan dolar.",
+        return _pack(
+            _say(f, f"{phrase}. Rupiah {'dapat dukungan' if up else 'lebih rentan'} hari ini."),
+            _say(f, "BI tidak otomatis mengubah bunga. Angka ini tidak membedakan harga dan jumlah barang."),
+            _say(f, "neraca dagang Indonesia tidak mengubah The Fed."),
+            _say(f, "pasar AS tidak merevisi bunga karena angka ini."),
+            _say(f, "harga batu bara, nikel, dan sawit tidak ditentukan oleh satu neraca Indonesia."),
+            _say(f, "kalau yang berubah cuma harga barang ekspor, bukan jumlah barang, itu tidak tertulis di angka ini."),
         )
     if family == "reserves":
-        return _id_pack(
-            f,
-            "stok yang turun sering berarti BI sedang menahan rupiah atau ada arus keluar. Dukungan ke mata uang bisa semu karena amunisinya berkurang.",
-            "bantalan yang menipis membatasi berapa lama BI bisa menstabilkan rupiah tanpa mengorbankan stance bunga.",
-            "The Fed tidak bergerak karena cadangan Indonesia.",
-            "tidak ada guncangan dolar global. Ini neraca stok domestik.",
-            "ketahanan terhadap penguatan dolar menurun jika stok devisa terus turun.",
-        )
-    if family == "guidance" and up:
-        return _id_pack(
-            f,
-            "yang berubah adalah nada BI yang lebih ketat, bukan data aktivitas baru. Rupiah dapat dukungan narasi, saham sensitif bunga tertekan.",
-            "nada ini hanya mengubah siklus jika keputusan bunga berikutnya mengikutinya.",
-            "komunikasi BI tidak merevisi Fed funds.",
-            "dolar global tidak berbelok karena nada BI.",
-            "satu komunikasi domestik tidak mengubah siklus pendanaan global.",
+        return _pack(
+            _say(f, f"{phrase}. {'BI lebih mampu menjaga rupiah.' if up else 'BI sedang menahan rupiah, atau ada uang yang keluar.'}"),
+            _say(f, "ini simpanan dolar, bukan tanda ekonomi tumbuh." if up else
+                  "kalau cadangan terus turun, BI lebih sulit menjaga rupiah tanpa menaikkan bunga."),
+            _say(f, "cadangan Indonesia tidak mengubah The Fed."),
+            _say(f, "pasar AS tidak merevisi bunga karena angka ini."),
+            _say(f, "pasar dunia tidak diubah. Yang berubah adalah kemampuan BI menjaga rupiah."),
+            _say(f, "dolar dunia tidak berbalik karena cadangan Indonesia."),
         )
     if family == "guidance":
-        return _id_pack(
-            f,
-            "nada BI yang lebih lunak menekan rupiah jika pasar percaya pelonggaran akan menyusul, dan menolong saham sensitif bunga.",
-            "siklus baru berubah jika BI benar-benar memotong, bukan dari nada semata.",
-            "The Fed tidak melunak karena komunikasi BI.",
-            "tidak ada impuls dolar global dari nada BI.",
-            "pendanaan global tidak berubah karena satu komunikasi Indonesia.",
+        return _pack(
+            _say(f, f"{phrase}. Rupiah {'dapat dukungan' if up else 'bisa melemah'} hari ini."),
+            _say(f, "bunga baru benar-benar berubah jika keputusan berikutnya mengikuti kata-kata ini."),
+            _say(f, "kata-kata BI tidak mengubah bunga The Fed."),
+            _say(f, "pasar AS tidak merevisi bunga karena pernyataan BI."),
+            _say(f, "dolar dunia tidak berbalik karena nada BI."),
+            _say(f, "satu pernyataan dalam negeri tidak mengubah pinjaman dunia."),
         )
-    return _id_pack(
-        f, _move(family, f["kind"]) + ". Efek utamanya domestik, lewat BI dan rupiah, bukan lewat The Fed.",
-        "stance BI hanya bergeser jika pola ini bertahan, bukan karena satu rilis.",
-        "pasar AS tidak merevisi Fed funds karena data Indonesia.",
-        "dolar global tidak berbelok karena rilis Indonesia.",
-        "siklus global tidak ditentukan oleh satu data Indonesia.",
-    )
-
-
-def _cn_pack(f, id_s, id_l, us_s, us_l, gl_s, gl_l):
-    pre = f"{f['title']} {f['place']}"
     return _pack(
-        f"{pre}: {id_s}", f"{pre}: {id_l}", f"{pre}: {us_s}",
-        f"{pre}: {us_l}", f"{pre}: {gl_s}", f"{pre}: {gl_l}",
+        _say(f, f"{phrase}. Efek utamanya di Indonesia, lewat BI dan rupiah."),
+        _say(f, "BI baru mengubah bunga jika pola ini bertahan, bukan karena satu rilis."),
+        _say(f, "pasar AS tidak mengubah bunga karena data Indonesia."),
+        _say(f, "The Fed tidak memakai angka ini."),
+        _say(f, "dolar dunia tidak berbalik karena rilis Indonesia."),
+        _say(f, "perdagangan dunia tidak ditentukan oleh satu data Indonesia."),
     )
 
 
-def _lines_cn(f):
-    family, up = f["family"], f["kind"] == "hot"
-    if family == "growth" and up:
-        return _cn_pack(
-            f,
-            "pertumbuhan yang lebih kuat menaikkan harapan permintaan batu bara, nikel, dan CPO. Rupiah dan saham komoditas RI dapat dukungan lewat harga komoditas, bukan karena BI mengubah bunga.",
-            "siklus ekspor RI ke China lebih sehat jika ini bukan sekali cetak. BI bukan aktor utama.",
-            "saham AS yang terekspos Asia bisa menguat tipis. Fed funds tidak direvisi.",
-            "The Fed tidak mengubah bunga karena pertumbuhan China. Efek ke AS adalah pendapatan global, bukan mandat harga.",
-            "logam industri dan mata uang komoditas menguat pada hari rilis. Dolar tidak harus melemah.",
-            "manufaktur global mendapat permintaan dari China. Itu siklus perdagangan, bukan siklus The Fed.",
-        )
-    if family == "growth":
-        return _cn_pack(
-            f,
-            "pertumbuhan yang lebih lemah memangkas harapan permintaan komoditas RI. Rupiah kehilangan dukungan harga komoditas pada hari yang sama.",
-            "ekspor ke China tetap berat jika perlambatan ini berlanjut beberapa kuartal.",
-            "The Fed tidak melonggar karena GDP China. Saham AS yang terekspos Asia bisa tertekan tipis.",
-            "jalur bunga AS tidak mengikuti pertumbuhan China.",
-            "logam dan energi kehilangan dukungan pada hari rilis.",
-            "siklus manufaktur global kehilangan permintaan dari China.",
-        )
-    if family == "rate" and up:
-        return _cn_pack(
-            f,
-            "pengetatan memangkas harapan stimulus. Harga komoditas dan saham ekspor RI tertekan hari itu.",
-            "permintaan China yang lebih mahal menahan volume ekspor RI lebih lama.",
-            "The Fed tidak ikut ketat. Saham AS paling kena lewat sentimen Asia yang tipis.",
-            "jalur bunga AS tidak mengikuti PBoC.",
-            "logam dan energi kehilangan dukungan pada hari keputusan yang lebih ketat.",
-            "manufaktur global kehilangan satu sumber pelonggaran.",
+def _cn_lines(f, phrase, up):
+    family = f["family"]
+    if family in ("growth", "activity"):
+        return _pack(
+            _say(f, f"{phrase}. Harga batu bara, nikel, dan sawit biasanya {'naik' if up else 'turun'}."),
+            _say(f, "BI tidak mengubah bunga. Ekspor Indonesia baru benar-benar berubah jika permintaan China bertahan."),
+            _say(f, "saham AS yang jual ke Asia bisa bergerak tipis. Bunga The Fed tidak berubah."),
+            _say(f, "The Fed tidak mengubah bunga karena China."),
+            _say(f, f"harga logam dan energi {'dapat dukungan' if up else 'kehilangan dukungan'} hari ini."),
+            _say(f, "pabrik dunia baru benar-benar terasa efeknya jika data China yang searah ini berulang."),
         )
     if family == "rate":
-        return _cn_pack(
-            f,
-            "bunga yang lebih rendah adalah stimulus. Harapan permintaan komoditas dan ekspor RI naik di hari yang sama, belum berupa volume yang sudah terjadi.",
-            "ekspor RI baru tertolong jika kredit China menyusul pemotongan ini, bukan hanya suku bunganya yang turun.",
-            "likuiditas global sedikit lebih mudah, tetapi Fed funds tidak direvisi karena PBoC.",
-            "The Fed tidak mengikuti pemotongan China.",
-            "logam dan mata uang komoditas menguat karena harapan, bukan karena data permintaan yang sudah tercetak.",
-            "stimulus yang bertahan baru mengubah siklus barang dunia. Satu pemotongan belum cukup untuk menyebut siklus baru.",
-        )
-    if family == "prices" and up:
-        return _cn_pack(
-            f,
-            "harga yang lebih panas membuat PBoC lebih hati-hati menstimulus. Harapan untuk ekspor RI meredup hari itu. Belum ketahuan apakah ini tekanan biaya atau permintaan.",
-            "kalau China menahan stimulus karena inflasi, permintaan komoditas RI tetap lemah lebih lama.",
-            "inflasi China bukan data The Fed. UST tidak direvisi.",
-            "mandat The Fed tidak memakai harga China.",
-            "stimulus PBoC menjadi kurang pasti hari ini. Harga barang global tidak otomatis naik atau turun sebelum komposisinya jelas.",
-            "eksportir komoditas kehilangan cerita pelonggaran China selama inflasi ini menjadi alasan menunda stimulus.",
+        return _pack(
+            _say(f, f"{phrase}. Harapan permintaan barang ekspor Indonesia {'meredup' if up else 'naik'}, belum berarti barangnya sudah terbeli."),
+            _say(f, "ekspor Indonesia baru ikut jika pabrik dan impor China benar-benar bergerak setelah ini."),
+            _say(f, "The Fed tidak ikut mengubah bunga."),
+            _say(f, "bunga AS tidak mengikuti bank sentral China."),
+            _say(f, f"logam dan energi {'kehilangan' if up else 'mendapat'} dukungan hari ini."),
+            _say(f, "satu keputusan belum mengubah perdagangan barang dunia."),
         )
     if family == "prices":
-        return _cn_pack(
-            f,
-            "harga yang lebih dingin membuka ruang stimulus PBoC. Saham komoditas RI bisa naik karena harapan, belum karena volume ekspor yang sudah terjadi.",
-            "pelonggaran China baru menolong ekspor RI jika stimulus lolos ke aktivitas.",
-            "The Fed tidak bergeser. Efek ke saham AS yang terekspos Asia tipis.",
-            "efek jangka panjang ke AS lewat harga barang impor, dan itu lambat. Bunga Fed tidak ikut.",
-            "harapan permintaan barang global, terutama logam dan energi, naik tipis.",
-            "disinflasi China yang berkelanjutan menekan harga barang dunia dan membantu inflasi impor negara lain, dengan jeda.",
-        )
-    if family == "trade" and up:
-        return _cn_pack(
-            f,
-            "surplus yang lebih besar sering berarti ekspor China deras atau impornya lemah. Impor yang lemah buruk untuk komoditas RI; ekspor China yang deras menambah persaingan di pasar ketiga.",
-            "kalau surplus ini datang dari impor yang lesu, siklus ekspor RI ke China tetap lemah meski headline neraca China terlihat sehat.",
-            "The Fed tidak bergerak. Saham AS yang bersaing dengan barang China bisa tertekan tipis, bukan karena bunga.",
-            "jalur The Fed tidak berubah. Efek jangka panjang adalah harga barang impor AS, dan itu lambat.",
-            "harga barang manufaktur mendapat tekanan pasokan China. Komoditas menunggu komposisi impor, yang tidak ada di headline.",
-            "surplus yang menetap menggeser pangsa perdagangan, bukan stance The Fed atau BI.",
+        return _pack(
+            _say(f, f"{phrase}. Bank sentral China {'lebih hati-hati memberi bantuan' if up else 'punya ruang memberi bantuan'}."),
+            _say(f, "ekspor Indonesia baru tertolong jika pabrik di China benar-benar lebih ramai."),
+            _say(f, "harga China bukan alasan The Fed mengubah bunga."),
+            _say(f, "pasar AS tidak merevisi bunga karena angka ini."),
+            _say(f, "bantuan pemerintah China jadi kurang pasti hari ini." if up else
+                  "harapan permintaan barang dunia, terutama logam dan energi, naik tipis."),
+            _say(f, "efek ke harga barang negara lain baru terasa belakangan, kalau pola ini bertahan."),
         )
     if family == "trade":
-        return _cn_pack(
-            f,
-            "surplus yang lebih kecil bisa berarti impor China lebih kuat, dan itu baik untuk komoditas RI, atau ekspor China yang melemah. Headline tidak memisahkan keduanya.",
-            "kalau penyebabnya impor yang pulih, ekspor RI baru tertolong setelah beberapa bulan, bukan pada hari rilis.",
-            "tidak ada revisi Fed funds. Efek ke AS kecil pada hari ini.",
-            "The Fed tidak mengubah jalur karena neraca China.",
-            "pasar barang global tidak mendapat arah yang bersih sebelum komposisi impor versus ekspor ketahuan.",
-            "pangsa perdagangan baru bergeser jika pola neraca ini bertahan, bukan karena satu bulan.",
-        )
-    if family == "activity" and up:
-        return _cn_pack(
-            f,
-            "ini survei bulanan, bukan GDP. Harapan permintaan batu bara, nikel, dan CPO naik, tetapi satu bulan belum mengubah BI.",
-            "ekspor RI baru benar-benar tertolong jika survei ini masuk ke produksi dan impor China.",
-            "Fed funds tidak direvisi oleh PMI atau aktivitas China.",
-            "The Fed tidak mengubah siklus karena momentum bulanan China.",
-            "logam bisa menguat tipis pada hari survei. Itu harapan, bukan volume yang sudah dikapalkan.",
-            "siklus manufaktur global tidak berbelok sebelum GDP dan impor China mengonfirmasi survei ini.",
-        )
-    if family == "activity":
-        return _cn_pack(
-            f,
-            "survei bulanan yang lebih lemah memangkas harapan komoditas RI hari ini. Bukan keputusan BI.",
-            "satu bulan yang lemah belum membatalkan siklus ekspor, tetapi menghapus cerita percepatan China.",
-            "pasar AS tidak merevisi bunga. Saham yang terekspos Asia bisa tertekan tipis.",
-            "jalur The Fed independen dari survei China.",
-            "logam dan energi kehilangan dukungan harapan pada hari rilis.",
-            "manufaktur global kehilangan momentum Asia hanya jika kelemahan survei ini berulang.",
-        )
-    if family == "labor" and up:
-        return _cn_pack(
-            f,
-            "pasar kerja China yang lebih ketat menopang konsumsi di China. Efek ke komoditas RI lebih kecil daripada data industri atau GDP.",
-            "konsumsi China yang bertahan baru menolong ekspor barang jadi RI, bukan otomatis batu bara dan nikel.",
-            "tenaga kerja China tidak masuk payroll AS atau Fed funds.",
-            "The Fed tidak memakai pasar kerja China.",
-            "dampak globalnya lewat konsumsi barang, kecil pada satu rilis.",
-            "siklus dunia tidak berbelok karena pengangguran China semata.",
+        return _pack(
+            _say(f, f"{phrase}. {'China mungkin membeli lebih sedikit dari luar, dan itu kurang baik untuk barang ekspor Indonesia.' if up else 'China mungkin membeli lebih banyak, dan itu baik untuk barang ekspor Indonesia. Bisa juga ekspor China yang melemah.'}"),
+            _say(f, "angka ini tidak memisahkan keduanya. Efeknya baru jelas setelah beberapa bulan."),
+            _say(f, "The Fed tidak bergerak karena neraca China."),
+            _say(f, "bunga AS tidak berubah. Efek ke harga barang impor AS, kalau ada, lambat."),
+            _say(f, "pasar barang dunia belum dapat arah yang bersih hari ini."),
+            _say(f, "pangsa dagang baru bergeser jika pola ini bertahan, bukan karena satu bulan."),
         )
     if family == "labor":
-        return _cn_pack(
-            f,
-            "kelonggaran tenaga kerja China menekan harapan konsumsi. Kanal ke RI lebih lemah daripada perlambatan industri.",
-            "BI tidak bereaksi. Yang panjang adalah daya beli China untuk barang impor.",
-            "tidak ada revisi pasar tenaga kerja AS.",
-            "jalur bunga AS tidak mengikuti pasar kerja China.",
-            "selera risiko Asia bisa sedikit turun, tanpa rezim dolar yang baru.",
-            "efek globalnya baru nyata jika konsumsi China yang lemah menekan impor selama beberapa kuartal.",
-        )
-    if family == "reserves" and up:
-        return _cn_pack(
-            f,
-            "stok devisa China yang naik bukan sinyal permintaan komoditas. Efek ke rupiah kecil pada hari rilis.",
-            "bantalan China yang lebih tebal tidak otomatis menambah ekspor RI.",
-            "cadangan China tidak masuk reaksi The Fed.",
-            "siklus bunga AS tidak berubah.",
-            "likuiditas global tidak berbalik karena satu catatan stok.",
-            "stok devisa bukan substitusi dari permintaan impor China.",
+        return _pack(
+            _say(f, f"{phrase}. Efek ke barang ekspor Indonesia lebih kecil daripada data pabrik atau pertumbuhan."),
+            _say(f, "yang panjang adalah daya beli orang China untuk barang impor."),
+            _say(f, "lapangan kerja China tidak mengubah laporan kerja AS."),
+            _say(f, "The Fed tidak memakai angka ini."),
+            _say(f, "pasar dunia bergerak kecil pada satu rilis."),
+            _say(f, "perdagangan dunia tidak berbalik karena pengangguran China semata."),
         )
     if family == "reserves":
-        return _cn_pack(
-            f,
-            "devisa China yang terpakai bukan serta-merta permintaan komoditas yang jatuh. Jangan membaca stok sebagai volume ekspor RI.",
-            "ketahanan China terhadap arus keluar naik atau turun terpisah dari kebutuhan BI.",
-            "The Fed tidak bergerak karena cadangan China.",
-            "tidak ada konsekuensi jalur bunga AS.",
-            "pasar valas global paling kena jika pasar membaca tekanan pada yuan, dan itu tidak otomatis.",
-            "satu bulan penurunan stok tidak mengubah siklus perdagangan.",
-        )
-    if family == "guidance" and up:
-        return _cn_pack(
-            f,
-            "nada PBoC yang lebih keras menunda cerita stimulus. Komoditas RI kehilangan harapan hari itu; volume belum berubah.",
-            "harapan ekspor baru mati jika nada keras ini diikuti suku bunga atau kredit yang lebih ketat.",
-            "komunikasi PBoC tidak merevisi Fed funds.",
-            "The Fed tidak mengeras karena nada China.",
-            "logam kehilangan dukungan harapan pada hari komunikasi.",
-            "siklus barang dunia hanya berubah jika kebijakan China benar-benar mengetat setelah nada ini.",
+        return _pack(
+            _say(f, f"{phrase}. Ini bukan tanda China membeli lebih banyak barang ekspor."),
+            _say(f, "cadangan China tidak otomatis menambah ekspor Indonesia."),
+            _say(f, "The Fed tidak bergerak karena cadangan China."),
+            _say(f, "bunga AS tidak berubah."),
+            _say(f, "uang beredar dunia tidak berbalik karena satu catatan simpanan."),
+            _say(f, "simpanan dolar bukan pengganti permintaan impor China."),
         )
     if family == "guidance":
-        return _cn_pack(
-            f,
-            "nada yang lebih lunak menghidupkan harapan stimulus. Harga komoditas bisa naik sebelum aktivitas China menyusul.",
-            "ekspor RI baru tertolong jika kredit dan impor China mengikuti nada ini.",
-            "The Fed tidak melunak karena komunikasi PBoC.",
-            "jalur bunga AS independen dari nada China.",
-            "mata uang komoditas menguat karena harapan, bukan karena data permintaan yang sudah ada.",
-            "satu komunikasi belum menjadi siklus pelonggaran China.",
-        )
-    return _cn_pack(
-        f,
-        _move(family, f["kind"]) + ". Kanal ke RI, kalau ada, lewat permintaan China, bukan lewat BI.",
-        "efeknya baru berarti jika pola ini bertahan beberapa rilis.",
-        "The Fed tidak merevisi bunga karena data China.",
-        "jalur AS tidak mengikuti PBoC atau data China.",
-        "harga global tidak otomatis berbalik pada satu rilis China.",
-        "siklus barang dunia hanya berubah jika data China yang searah berulang.",
-    )
-
-
-def _lines_jp_rate(f):
-    if f["kind"] == "hot":
         return _pack(
-            _prefixed(f, "keputusan yang lebih ketat mengangkat yen dan bisa melepas pinjaman berbiaya yen pada hari yang sama. IHSG dan rupiah tertekan lewat selera risiko, bukan karena BI mengubah bunga."),
-            _prefixed(f, "pendanaan yen yang lebih mahal menahan arus ke EM selama BoJ tidak kembali longgar. BI hanya terkena lewat kanal itu."),
-            _prefixed(f, "harga UST bisa melemah jika posisi berbiaya yen ditutup hari ini. Bukan karena The Fed mengubah stance."),
-            _prefixed(f, "The Fed tidak mengikuti BoJ. Yang tersisa adalah premi jangka panjang kalau pinjaman yen benar-benar menyempit."),
-            _prefixed(f, "yen menguat dan aset risiko global goyang pada hari keputusan BoJ."),
-            _prefixed(f, "satu sumber pendanaan murah global menipis. Siklusnya baru berubah jika BoJ meneruskan pengetatan, bukan pada satu rapat."),
+            _say(f, f"{phrase}. Harga barang ekspor Indonesia bisa {'turun' if up else 'naik'} karena harapan, belum karena barang yang sudah terbeli."),
+            _say(f, "ekspor Indonesia baru berubah jika pinjaman dan impor China mengikuti kata-kata ini."),
+            _say(f, "The Fed tidak mengubah bunga karena pernyataan China."),
+            _say(f, "bunga AS tidak mengikuti nada China."),
+            _say(f, f"logam {'kehilangan' if up else 'mendapat'} dukungan harapan hari ini."),
+            _say(f, "satu pernyataan belum menjadi perubahan kebijakan yang menetap."),
         )
     return _pack(
-        _prefixed(f, "keputusan yang lebih longgar melemahkan yen dan menghidupkan kembali pinjaman berbiaya yen. Aset risiko, termasuk IHSG, dapat dukungan sentimen hari itu."),
-        _prefixed(f, "arus ke EM tertolong hanya selama BoJ tidak dipaksa mengetatkan lagi oleh yen yang terlalu lemah."),
-        _prefixed(f, "The Fed tidak melonggar karena BoJ. UST paling kena lewat pembukaan kembali posisi yen, kecil pada satu hari."),
-        _prefixed(f, "jalur bunga AS independen. Yen yang terlalu lemah justru bisa memaksa BoJ berbalik nanti."),
-        _prefixed(f, "yen melemah dan selera risiko global naik pada hari keputusan yang lebih longgar."),
-        _prefixed(f, "pendanaan yen yang murah kembali menambah likuiditas global, sampai inflasi Jepang membantahnya."),
+        _say(f, f"{phrase}. Efek ke Indonesia, kalau ada, lewat permintaan China, bukan lewat BI."),
+        _say(f, "efeknya baru berarti jika pola ini bertahan beberapa rilis."),
+        _say(f, "The Fed tidak mengubah bunga karena data China."),
+        _say(f, "bunga AS tidak mengikuti China."),
+        _say(f, "harga dunia tidak otomatis berbalik pada satu rilis."),
+        _say(f, "perdagangan barang baru berubah jika data China yang searah berulang."),
     )
 
 
-def _lines_eu_rate(f):
-    if f["kind"] == "hot":
-        return _pack(
-            _prefixed(f, "bunga yang lebih ketat mengangkat imbal hasil euro dan euro itu sendiri. Rupiah hanya kena imbal hasil global, kecil dibanding keputusan The Fed."),
-            _prefixed(f, "pelonggaran negara maju yang serempak mundur. BI tetap lebih terikat pada The Fed daripada pada ECB."),
-            _prefixed(f, "harga UST bisa melemah karena durasi global ikut, tetapi Fed funds tidak direvisi hanya karena ECB."),
-            _prefixed(f, "The Fed tidak mengikuti ECB. Yang panjang adalah korelasi imbal hasil, bukan mandat."),
-            _prefixed(f, "euro menguat, imbal hasil euro naik, dan durasi global melemah pada hari keputusan."),
-            _prefixed(f, "siklus pelonggaran Eropa mundur. Dolar tidak otomatis melemah kalau The Fed masih lebih ketat dari ECB."),
-        )
-    return _pack(
-        _prefixed(f, "bunga yang lebih longgar menekan imbal hasil euro. Rupiah mendapat ruang tipis lewat imbal hasil global, bukan lewat BI."),
-        _prefixed(f, "pelonggaran Eropa yang lebih dalam tidak otomatis memberi BI ruang. Batas BI tetap The Fed dan rupiah."),
-        _prefixed(f, "Fed funds tidak direvisi. UST paling kena lewat korelasi durasi yang kecil."),
-        _prefixed(f, "The Fed tidak ikut memotong karena ECB."),
-        _prefixed(f, "euro melemah dan imbal hasil euro turun pada hari keputusan."),
-        _prefixed(f, "siklus pelonggaran Eropa lebih dalam. Itu belum pelonggaran global yang serempak selama The Fed belum ikut."),
-    )
-
-
-def _lines_spillover(f):
-    """Negara selain AS/Indonesia/China, atau jenis yang tidak punya peta khusus."""
-    pre = f"{f['title']} {f['place']}"
-    actor, family, kind = f["actor"], f["family"], f["kind"]
-    up = kind == "hot"
-    move = _move(family, kind)
+def _other_lines(f, phrase, up):
+    family, place, actor = f["family"], f["place"], f["actor"]
     if family in ("prices", "labor", "rate", "guidance"):
-        id_s = (f"{move}. Imbal hasil global {'naik' if up else 'turun'} hari ini dan rupiah menanggungnya, "
-                f"tetapi {actor} bukan The Fed, jadi efeknya lebih kecil daripada data AS.")
-        id_l = (f"BI tidak mengubah stance hanya karena {actor}. "
-                + ("Kalau pengetatan ini bertahan, biaya dana global sedikit lebih tinggi." if up else
-                   "Kalau pelonggaran ini bertahan, biaya dana global sedikit lebih ringan, dengan batas tetap The Fed."))
-        us_s = f"Fed funds tidak direvisi karena {actor}. UST paling bergerak lewat korelasi imbal hasil yang tipis."
-        us_l = f"The Fed tidak mengikuti {actor}. Mandat harga AS tidak memakai rilis ini."
-        gl_s = f"mata uang {f['place']} dan imbal hasil {actor} bergerak {'naik' if up else 'turun'} pada sesi rilis."
-        gl_l = f"siklus {actor} menjadi {'lebih ketat' if up else 'lebih longgar'} hanya jika pola ini berulang, bukan pada satu rilis."
-    elif family in ("growth", "activity"):
-        if f["origin"] == "JP":
-            id_s = f"{move}. Sentimen manufaktur global bisa ikut, tetapi efek ke komoditas RI jauh lebih kecil daripada data China."
-        elif f["origin"] == "EU":
-            id_s = f"{move}. Permintaan Eropa yang berubah hanya sedikit menggeser ekspor RI. Bukan kanal komoditas China."
-        else:
-            id_s = f"{move}. Kanal ke rupiah tidak langsung dan kecil pada hari rilis."
-        id_l = f"BI tidak bergeser karena permintaan {f['place']}. Efek panjangnya baru ada jika perdagangan dengan negara itu benar-benar berubah."
-        us_s = f"pertumbuhan {f['place']} tidak merevisi Fed funds pada hari rilis."
-        us_l = "jalur The Fed tetap ditentukan data AS, bukan cetakan negara ini."
-        gl_s = f"selera risiko global bergerak tipis. {'Survei bulanan mudah balik.' if family == 'activity' else 'Satu cetakan pertumbuhan masih bisa direvisi.'}"
-        gl_l = f"perdagangan dunia tidak berbelok sebelum data {f['place']} yang searah berulang."
-    elif family == "trade":
-        id_s = f"{move}. Neraca {f['place']} bukan pasokan valas Indonesia, jadi rupiah hampir tidak bergerak hari ini."
-        id_l = "BI tidak mendapat informasi baru tentang cadangan atau ekspor RI dari neraca negara lain."
-        us_s = f"The Fed tidak mengubah bunga karena neraca {f['place']}."
-        us_l = "defisit atau surplus negara lain bukan mandat The Fed."
-        gl_s = "arus perdagangan tidak berbalik pada satu rilis. Komposisi harga versus volume tidak ada di headline."
-        gl_l = "pangsa perdagangan baru bergeser jika pola neraca ini bertahan beberapa bulan."
-    else:
-        id_s = f"{move}. Tidak ada kanal yang mengharuskan rupiah bergerak besar hari ini."
-        id_l = f"BI tidak memakai { _regime(family) } {f['place']} sebagai alasan mengubah bunga."
-        us_s = "pasar AS tidak dihargai ulang oleh rilis ini."
-        us_l = "siklus The Fed tidak bergeser."
-        gl_s = f"pasar global tidak mendapat rezim baru dari { _regime(family) } {f['place']}."
-        gl_l = "satu rilis tidak mengubah siklus pendanaan global."
-    if f["origin"] == "JP" and family in ("prices", "guidance", "labor"):
-        gl_s += " Yen bisa ikut bergerak jika pasar mengubah ekspektasi BoJ."
-    if f["origin"] == "EU":
-        id_l += " BI tetap lebih terikat pada The Fed daripada pada ECB."
-    return _pack(
-        f"{pre}: {id_s}", f"{pre}: {id_l}", f"{pre}: {us_s}",
-        f"{pre}: {us_l}", f"{pre}: {gl_s}", f"{pre}: {gl_l}",
-    )
-
-
-def _flat_lines(f):
-    pre = f"{f['title']} {f['place']}"
-    regime = _regime(f["family"])
-    if f["kind"] == "unknown":
         return _pack(
-            f"{pre}: belum bisa dibanding konsensus. Rupiah tidak mendapat arah baru hari ini; yang ada hanya level actual.",
-            f"{pre}: BI tidak menggeser stance tanpa pembanding. Level {regime} baru berarti setelah ada tren.",
-            f"{pre}: pasar AS tidak merevisi harga selama selisih terhadap konsensus tidak terukur.",
-            f"{pre}: The Fed tidak mendapat informasi arah sebelum ada pembanding.",
-            f"{pre}: dolar dan selera risiko tidak punya katalis selama kejutannya tidak terukur.",
-            f"{pre}: siklus global tidak berbelok. Angka ini masuk peta setelah ada konsensus atau previous.",
+            _say(f, f"{phrase}. Rupiah bisa {'tertekan' if up else 'sedikit lega'} hari ini, tapi efeknya lebih kecil daripada data AS."),
+            _say(f, f"BI tidak mengubah bunga hanya karena {actor}."),
+            _say(f, f"The Fed tidak mengubah bunga karena {actor}."),
+            _say(f, "bunga AS tetap ditentukan data AS."),
+            _say(f, f"mata uang {place} bergerak pada hari rilis."),
+            _say(f, "efeknya baru bertahan jika pola ini berulang, bukan pada satu rilis."),
         )
-    lines = _pack(
-        f"{pre}: sesuai pembanding, jadi tidak ada impuls baru ke rupiah hari ini. Harga SBN tidak harus direvisi hanya karena selisih nol.",
-        f"{pre}: yang tetap mengikat adalah level {regime}, bukan kejutan yang tidak ada. Stance tidak bergeser hari ini.",
-        f"{pre}: UST dan saham AS tidak dihargai ulang oleh angka yang sudah sesuai ekspektasi.",
-        f"{pre}: jalur The Fed tidak mendapat alasan baru. Level {regime} yang dikonfirmasi tetap menjadi patokan.",
-        f"{pre}: tidak ada katalis dolar dari angka yang sesuai konsensus. Pergerakan hari ini, kalau ada, datang dari hal lain.",
-        f"{pre}: hanya mengunci {regime} {f['place']} yang sudah dihargai. Siklus global tidak berbelok.",
+    if family in ("growth", "activity"):
+        return _pack(
+            _say(f, f"{phrase}. Efek ke rupiah kecil pada hari ini."),
+            _say(f, f"BI tidak mengubah bunga karena permintaan di {place}."),
+            _say(f, f"pertumbuhan {place} tidak mengubah bunga The Fed hari ini."),
+            _say(f, "bunga AS tetap ditentukan data AS."),
+            _say(f, "pasar dunia bergerak tipis."),
+            _say(f, f"perdagangan dunia tidak berbalik sebelum data {place} yang searah berulang."),
+        )
+    if family == "trade":
+        return _pack(
+            _say(f, f"{phrase}. Neraca {place} bukan uang yang masuk ke Indonesia, jadi rupiah hampir tidak bergerak."),
+            _say(f, "BI tidak dapat informasi baru tentang ekspor Indonesia dari neraca negara lain."),
+            _say(f, f"The Fed tidak mengubah bunga karena neraca {place}."),
+            _say(f, "bunga AS tidak mengikuti neraca negara lain."),
+            _say(f, "arus dagang tidak berbalik pada satu rilis."),
+            _say(f, "pangsa dagang baru bergeser jika pola ini bertahan beberapa bulan."),
+        )
+    return _pack(
+        _say(f, f"{phrase}. Tidak ada alasan rupiah bergerak besar hari ini."),
+        _say(f, f"BI tidak mengubah bunga karena angka {place} ini."),
+        _say(f, "pasar AS tidak diubah oleh rilis ini."),
+        _say(f, "The Fed tidak mengubah bunga."),
+        _say(f, "pasar dunia tidak mendapat arah baru."),
+        _say(f, "satu rilis tidak mengubah pinjaman dunia."),
     )
-    if f["origin"] == "US" and f["family"] in ("prices", "labor", "rate", "growth", "guidance"):
-        lines["id_panjang"] = (
-            f"{pre}: selisih nol tidak membuka ruang BI. Level {regime} AS yang dikonfirmasi tetap menahan The Fed, "
-            "dan BI tidak bisa jauh lebih longgar dari itu."
-        )
-    elif f["origin"] == "ID":
-        lines["id_panjang"] = (
-            f"{pre}: selisih nol tidak mengubah BI hari ini. Yang tetap menentukan adalah level {regime} Indonesia."
-        )
-    elif f["origin"] == "CN" and f["family"] in ("growth", "activity", "trade", "prices", "rate"):
-        lines["id_pendek"] = (
-            f"{pre}: sesuai pembanding, jadi harapan komoditas RI tidak direvisi hari ini. "
-            f"Level {regime} China yang sudah dihargai tetap menjadi patokan."
-        )
-    return lines
 
 
 def market_views(ev):
     f = _facts(ev)
-    kind, origin, family = f["kind"], f["origin"], f["family"]
-    if kind in ("inline", "unknown"):
-        lines = _flat_lines(f)
-    elif origin == "US" and family == "growth":
-        lines = _lines_growth_us(f)
-    elif origin == "US" and family == "activity":
-        lines = _lines_activity_us(f)
-    elif origin == "US" and family == "trade":
-        lines = _lines_trade_us(f)
-    elif origin == "US" and family == "reserves":
-        lines = _lines_reserves_us(f)
-    elif origin == "US":
-        lines = _lines_us(f)
-    elif origin == "ID":
-        lines = _lines_id(f)
-    elif origin == "CN":
-        lines = _lines_cn(f)
-    elif origin == "JP" and family == "rate":
-        lines = _lines_jp_rate(f)
-    elif origin == "EU" and family == "rate":
-        lines = _lines_eu_rate(f)
-    else:
-        lines = _lines_spillover(f)
-    return {k: _clip(_ensure_print(f, (lines or {}).get(k)), 380) for k in MARKET_KEYS}
-
+    lines = _market_lines(f)
+    return {k: _clip(lines.get(k), 420) for k in MARKET_KEYS}
 
 def build_macro_read(ev):
     read = market_views(ev)
@@ -1153,22 +832,23 @@ def llm_analysis(ev, level, read, next_txt):
                                        "previous", "unit", "scale", "source")}
     peta = {k: read.get(k) for k in ("ringkasan",) + MARKET_KEYS}
     prompt = (
-        "Kamu analis makro untuk investor Indonesia. Baca rilis ini sebagai sinyal tentang siklus "
-        "dan reaksi kebijakan, bukan sebagai kalimat bahwa angkanya di atas atau di bawah konsensus.\n"
-        "Gunakan HANYA angka yang diberikan. Jangan mengarang data lain. Jangan memberi rekomendasi beli atau jual.\n"
-        "Bahasa Indonesia, lugas.\n"
+        "Kamu menjelaskan rilis ekonomi ke orang yang bukan ekonom, dalam bahasa Indonesia yang pendek dan biasa.\n"
+        "Jangan pakai kata stance, siklus, kanal, momentum, disinflasi, durasi, atau rezim. "
+        "Kalau perlu menyebut bunga, dolar, rupiah, saham, atau harga barang, pakai kata itu saja.\n"
+        "Gunakan HANYA angka yang diberikan. Jangan mengarang data lain. Jangan menyuruh beli atau jual.\n"
         "Balas HANYA JSON valid, tanpa markdown, dengan kunci:\n"
-        "ringkasan: 3 sampai 4 kalimat. Kalimat pertama adalah arti makro cetakan ini bagi siklus atau bank sentral "
-        "yang relevan. Sebut nama indikator dan angkanya. Sebut juga apa yang satu rilis belum bisa buktikan.\n"
-        "id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang: masing-masing SATU kalimat, "
-        "dan keenamnya harus berbeda. Pasar Indonesia, pasar Amerika, dan global; masing-masing jangka pendek "
-        "(sesi rilis) dan jangka panjang (siklus kebijakan). Tiap kalimat menyebut nama indikator serta arah "
-        "kejutannya, plus kanal yang nyata (dolar, imbal hasil, rupiah, SBN, IHSG, komoditas, atau yen). "
-        "Kalau efek ke suatu pasar kecil, katakan kecil dan sebabnya. Jangan mengarang guncangan.\n\n"
+        "ringkasan: 2 atau 3 kalimat pendek. Sebut nama indikator, angkanya, dan artinya dalam hidup sehari-hari "
+        "(lebih banyak orang dapat kerja, harga naik lebih cepat, bunga lebih tinggi, dan sejenisnya). "
+        "Sebut juga apa yang satu laporan ini belum putuskan.\n"
+        "id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang: masing-masing SATU kalimat pendek, "
+        "dan keenamnya harus berbeda. Pasar Indonesia, pasar Amerika, dan global. "
+        "Jangka pendek artinya hari rilis. Jangka panjang artinya beberapa bulan ke depan. "
+        "Tiap kalimat menyebut nama indikator dan apakah angkanya lebih kuat atau lebih lemah dari perkiraan. "
+        "Kalau efeknya kecil, katakan kecil dan kenapa.\n\n"
         f"Data: {json.dumps(payload, ensure_ascii=False)}\n"
         f"Kategori dampak ke Indonesia: {level}\n"
         f"Rilis berikutnya: {next_txt}\n"
-        "Peta mesin berikut hanya supaya kanal penting tidak terlewat. Jangan disalin kata per kata.\n"
+        "Peta berikut hanya supaya efek yang penting tidak terlewat. Jangan disalin kata per kata.\n"
         f"Peta: {json.dumps(peta, ensure_ascii=False)}"
     )
     try:
@@ -1404,8 +1084,63 @@ def _extreme_index(vals, when, want_max):
     return best
 
 
+def _overlap(a, b, pad=3):
+    return not (a.x1 + pad < b.x0 or b.x1 + pad < a.x0 or a.y1 + pad < b.y0 or b.y1 + pad < a.y0)
+
+
+def _place_note(ax, fig, xy, text, offsets, occupied, **style):
+    """Coba beberapa posisi sampai label tidak menimpa label lain. Kalau sempit, tetap tempel."""
+    renderer = fig.canvas.get_renderer()
+    fallback = None
+    for dx, dy in offsets:
+        note = ax.annotate(text, xy, xytext=(dx, dy), textcoords="offset points", **style)
+        fig.canvas.draw()
+        box = note.get_window_extent(renderer).expanded(1.04, 1.12)
+        if fallback is None:
+            fallback = (note, box)
+        if any(_overlap(box, old) for old in occupied):
+            if fallback[0] is not note:
+                note.remove()
+            continue
+        if fallback[0] is not note:
+            fallback[0].remove()
+        occupied.append(box)
+        return note
+    if fallback:
+        occupied.append(fallback[1])
+        return fallback[0]
+    return None
+
+
+def chart_points(ev, now, months=12):
+    """Satu angka per bulan. Kalender TradingView dipotong 2000 event, jadi diambil per potongan."""
+    k = series_key(ev)
+    by_month = {}
+    end = now
+    for _ in range(14):
+        batch = fetch_events(end, back_days=45, fwd_days=0)
+        if not batch:
+            break
+        for e in batch:
+            if series_key(e) != k or e.get("actual") is None:
+                continue
+            when = parse_dt(e["date"]).astimezone(WIB)
+            key = (when.year, when.month)
+            prev = by_month.get(key)
+            if prev is None or e["date"] > prev["date"]:
+                by_month[key] = e
+        oldest = min(parse_dt(e["date"]) for e in batch)
+        nxt = oldest - dt.timedelta(hours=1)
+        if nxt >= end or (now - nxt).days > 420 or len(by_month) >= months:
+            break
+        end = nxt
+    when = parse_dt(ev["date"]).astimezone(WIB)
+    by_month[(when.year, when.month)] = ev
+    return sorted(by_month.values(), key=lambda e: e["date"])[-months:]
+
+
 def make_chart(ev, now):
-    """Grafik Actual vs Forecast. Garis actual dimuluskan, puncak dan dasar diberi bulan."""
+    """Garis actual yang halus, satu titik berlabel per bulan, plus puncak dan dasar."""
     try:
         import io as _io
         import matplotlib
@@ -1416,61 +1151,83 @@ def make_chart(ev, now):
         log.warning("matplotlib belum terpasang, grafik dilewati")
         return None
 
-    k = series_key(ev)
-    pts = {e["id"]: e for e in history_events(now) + [ev]
-           if series_key(e) == k and e.get("actual") is not None}
-    pts = sorted(pts.values(), key=lambda e: e["date"])[-24:]
+    pts = chart_points(ev, now, months=12)
     if len(pts) < 3:
         return None
     x = [parse_dt(e["date"]).astimezone(WIB) for e in pts]
-    act = [e["actual"] for e in pts]
+    act = [float(e["actual"]) for e in pts]
     fc = [e.get("forecast") for e in pts]
     suffix = (ev.get("scale") or "") + ("%" if ev.get("unit") == "%" else "")
 
-    fig, ax = plt.subplots(figsize=(8, 4.3), dpi=150)
+    fig, ax = plt.subplots(figsize=(11.4, 5.6), dpi=140)
     fig.patch.set_facecolor("white")
     xs = mdates.date2num(x)
-    smooth_x, smooth_y = _smooth_curve(xs, act)
-    smooth_when = mdates.num2date(smooth_x)
+    smooth_x, smooth_y = _smooth_curve(xs, act, n=480)
+    smooth_when = mdates.num2date(smooth_x, tz=WIB)
     floor = min(act + [v for v in fc if v is not None])
-    ax.fill_between(smooth_when, smooth_y, floor, color=BRAND_SOFT, alpha=0.85, zorder=1)
-    ax.plot(smooth_when, smooth_y, color=BRAND_RED, lw=2.6, zorder=3, label="Actual", solid_capstyle="round")
-    ax.plot(x, act, linestyle="none", marker="o", ms=4.5, color=BRAND_RED, zorder=4)
+    ax.fill_between(smooth_when, smooth_y, floor, color=BRAND_SOFT, alpha=0.55, zorder=1)
+    ax.plot(smooth_when, smooth_y, color=BRAND_RED, lw=2.8, zorder=3, label="Actual",
+            solid_capstyle="round", solid_joinstyle="round")
+    ax.plot(x, act, linestyle="none", marker="o", ms=7, color=BRAND_RED,
+            markeredgecolor="white", markeredgewidth=1.4, zorder=5)
     fx = [(a, b) for a, b in zip(x, fc) if b is not None]
-    if fx:
-        ax.plot([a for a, _ in fx], [b for _, b in fx], color=BRAND_DARK, lw=1.5,
-                ls=(0, (4, 3)), zorder=2, label="Forecast/Konsensus")
-    ax.scatter([x[-1]], [act[-1]], s=70, color=BRAND_RED, edgecolor="white", lw=2, zorder=5)
-    ax.annotate(f"{act[-1]:g}{suffix}", (x[-1], act[-1]), xytext=(-8, 12), ha="right",
-                textcoords="offset points", color=BRAND_RED, fontsize=11, fontweight="bold")
+    if len(fx) >= 2:
+        fxs = mdates.date2num([a for a, _ in fx])
+        fys = [b for _, b in fx]
+        sg, sy = _smooth_curve(fxs, fys, n=360)
+        ax.plot(mdates.num2date(sg, tz=WIB), sy, color="#4A4A4A", lw=1.5,
+                ls=(0, (5, 3)), zorder=2, label="Forecast")
+    span = max(act) - min(act) or 1.0
+    ax.set_ylim(min(act) - span * 0.42, max(act) + span * 0.55)
+    ax.set_xlim(xs[0] - 12, xs[-1] + 12)
 
     peak_i = _extreme_index(act, x, True)
     trough_i = _extreme_index(act, x, False)
-    if act[peak_i] != act[trough_i]:
-        for idx, kind, dy in ((peak_i, "Puncak", 14), (trough_i, "Dasar", -18)):
+    show_marks = act[peak_i] != act[trough_i]
+    occupied = []
+    fig.canvas.draw()
+    value_style = dict(
+        ha="center", fontsize=8, color="#7A1020", fontweight="bold", zorder=7, clip_on=False,
+        bbox={"boxstyle": "round,pad=0.15", "fc": "white", "ec": "none", "alpha": 0.92},
+    )
+    for i, (when, val) in enumerate(zip(x, act)):
+        above = True
+        if 0 < i < len(act) - 1:
+            above = val >= act[i - 1]
+        offsets = []
+        for dy in ((14, 28, 42, -16, -30, -44) if above else (-16, -30, -44, 14, 28, 42)):
+            for dx in (0, 16, -16, 32, -32):
+                offsets.append((dx, dy))
+        _place_note(ax, fig, (when, val), f"{val:.2f}{suffix}", offsets, occupied, **value_style)
+    if show_marks:
+        for idx, kind, prefer in ((peak_i, "Puncak", 1), (trough_i, "Dasar", -1)):
             when = x[idx]
             label = f"{kind} {BULAN[when.month - 1]} {when.year}"
-            ax.annotate(
-                label, (when, act[idx]), xytext=(0, dy), textcoords="offset points",
-                ha="center", va="bottom" if dy > 0 else "top", fontsize=8, color=BRAND_DARK,
-                fontweight="bold", zorder=6, clip_on=False,
-                bbox={"boxstyle": "round,pad=0.2", "fc": "white", "ec": "#E0E0E0", "lw": 0.6},
+            dx0 = 36 if idx < len(act) - 2 else -46
+            offsets = [(dx0, 18 * prefer), (-dx0, 18 * prefer), (dx0, 34 * prefer),
+                       (0, 36 * prefer), (dx0, -22 * prefer)]
+            _place_note(
+                ax, fig, (when, act[idx]), label, offsets, occupied,
+                ha="left" if dx0 > 0 else "right", fontsize=8.5, color=BRAND_DARK,
+                fontweight="bold", zorder=8, clip_on=False,
+                bbox={"boxstyle": "round,pad=0.25", "fc": "#FFF8F8" if kind == "Puncak" else "#F4F7FB",
+                      "ec": "#E4C6CB" if kind == "Puncak" else "#D5DEE8", "lw": 0.6},
             )
 
     for side in ("top", "right", "left"):
         ax.spines[side].set_visible(False)
     ax.spines["bottom"].set_color("#BDBDBD")
     ax.grid(axis="y", color=BRAND_GRID, lw=0.8)
-    ax.tick_params(colors="#666666", labelsize=9, length=0)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %y"))
-    if suffix:
-        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}{suffix}"))
-    fig.add_artist(matplotlib.lines.Line2D([0.06, 0.14], [0.955, 0.955], color=BRAND_RED, lw=4))
-    fig.text(0.06, 0.87, ev["title"], fontsize=13, fontweight="bold", color=BRAND_DARK)
-    fig.text(0.06, 0.82, f"{ev.get('country')} · {len(pts)} rilis terakhir · sumber: TradingView",
-             fontsize=8.5, color="#777777")
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{BULAN[d.month - 1]}\n{d.year}" for d in x], fontsize=8, color="#555555")
+    ax.tick_params(axis="x", length=0, pad=4)
+    ax.tick_params(axis="y", colors="#666666", labelsize=9, length=0)
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.2f}{suffix}"))
+    fig.text(0.06, 0.955, ev["title"], fontsize=15, fontweight="bold", color=BRAND_DARK)
+    fig.text(0.06, 0.915, f"{ev.get('country')} · {len(pts)} bulan terakhir · sumber: TradingView",
+             fontsize=9, color="#777777")
     ax.legend(loc="upper right", frameon=False, fontsize=9, labelcolor=BRAND_DARK)
-    fig.subplots_adjust(left=0.09, right=0.96, top=0.74, bottom=0.14)
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.84, bottom=0.16)
     buf = _io.BytesIO()
     fig.savefig(buf, format="png")
     plt.close(fig)
@@ -1893,9 +1650,25 @@ def backfill_sheets(st, now, min_rank, budget_s):
 
 
 # ---------------------------------------------------------------- mode tes
+def _pick_test_event(done):
+    """Rilis terakhir, atau yang judulnya cocok dengan TEST_MATCH. None kalau tidak ada."""
+    if not TEST_MATCH:
+        return done[-1]
+    needle = _compact_title(TEST_MATCH)
+    matched = [e for e in done if needle in _compact_title(e.get("title"))]
+    if not matched:
+        log.warning("TES: tidak ada rilis yang cocok dengan %s", TEST_MATCH)
+        return None
+    headline = [e for e in matched if "private" not in _compact_title(e.get("title"))]
+    pool = headline or matched
+    # Tanggal terbaru menang. Kalau sama, judul yang lebih pendek (headline, bukan "Private").
+    pool.sort(key=lambda e: (e.get("date") or "", -len(e.get("title") or "")))
+    return pool[-1]
+
+
 def test_send(now):
-    """Kirim rilis berdampak SEDANG/TINGGI terakhir (7 hari) ke Discord + Sheets.
-    Catatan bot tidak diubah, jadi aman dijalankan berkali-kali."""
+    """Kirim satu rilis berdampak SEDANG/TINGGI. State tidak diubah.
+    TEST_MATCH membatasi judul, supaya tes tidak mengirim rilis lain."""
     min_rank = LEVEL_RANK.get(MIN_ALERT, 1)
     evs = fetch_events(now, back_days=7, fwd_days=0)
     done = sorted((e for e in evs if e.get("actual") is not None and parse_dt(e["date"]) <= now
@@ -1903,10 +1676,16 @@ def test_send(now):
     if not done:
         log.warning("TES: tidak ada rilis berdampak sedang/tinggi dalam 7 hari terakhir")
         return
-    ev = done[-1]
+    ev = _pick_test_event(done)
+    if ev is None:
+        return
     log.info("TES: mengirim %s %s (%s)", ev.get("country"), ev.get("title"), ev.get("date"))
     embed = release_embed(ev, evs, now)
     embed["title"] = "🧪 TES · " + embed["title"]
+    log.info("TES ringkasan: %s", embed.get("description"))
+    for field in embed.get("fields") or []:
+        if field.get("name") in ("Pasar Indonesia", "Pasar Amerika", "Global"):
+            log.info("TES %s: %s", field["name"], (field.get("value") or "").replace("\n", " | "))
     png = make_chart(ev, now)
     if png:
         embed["image"] = {"url": "attachment://chart.png"}

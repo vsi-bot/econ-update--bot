@@ -1,0 +1,36 @@
+name: NFP Discord send
+
+# Sekali jalan: push yang mengubah file ini mengirim satu Non Farm Payrolls ke Discord.
+# Tidak memanggil Sheets dan tidak mengubah state posted.
+on:
+  push:
+    branches:
+      - cursor/plain-language-nfp-chart-5a96
+    paths:
+      - .github/workflows/nfp-one-send.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nfp-one-send
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet requests matplotlib
+      - name: Satu NFP ke Discord
+        run: python calendar_bot.py
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          COUNTRIES: ID,US,CN,EU,JP
+          MIN_ALERT: SEDANG
+          TEST_SEND: "1"
+          TEST_MATCH: "nonfarm payroll"
