@@ -57,6 +57,8 @@ TEST_SEND = os.getenv("TEST_SEND", "0") == "1"  # kirim 1 rilis terakhir sebagai
 TEST_MATCH = os.getenv("TEST_MATCH", "").strip()  # kalau diisi, tes hanya rilis yang judulnya cocok
 TEST_COUNTRY = os.getenv("TEST_COUNTRY", "").strip().upper()
 TEST_BACK_DAYS = int(os.getenv("TEST_BACK_DAYS", "7") or "7")
+CATCHUP_SEND = os.getenv("CATCHUP_SEND", "0") == "1"
+CATCHUP_IDS = [x.strip() for x in os.getenv("CATCHUP_IDS", "").split(",") if x.strip()]
 SHEETS_URL = os.getenv("SHEETS_WEBHOOK_URL", "")
 SHEETS_TOKEN = os.getenv("SHEETS_TOKEN", "")
 BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "1830"))  # ±5 tahun riwayat untuk Google Sheets
@@ -1843,6 +1845,57 @@ def _pick_test_event(done):
     return pool[-1]
 
 
+def _catchup_actuals():
+    raw = os.getenv("CATCHUP_ACTUALS", "").strip()
+    if not raw:
+        return {}
+    data = json.loads(raw)
+    return {str(k): float(v) for k, v in data.items()}
+
+
+def catchup_send(now):
+    """Kirim id yang terlewat, sekali. Lewati yang sudah ada di posted. Tidak ke Sheets."""
+    overrides = _catchup_actuals()
+    ids = CATCHUP_IDS or list(overrides)
+    evs = fetch_events(now, back_days=4, fwd_days=1)
+    by_id = {e["id"]: e for e in evs}
+    st = load_state()
+    posted = set(str(x) for x in st.get("posted") or [])
+    min_rank = LEVEL_RANK.get(MIN_ALERT, 1)
+    for eid in ids:
+        ev = by_id.get(str(eid))
+        if ev is None:
+            log.warning("CATCHUP: id %s tidak ketemu", eid)
+            continue
+        if str(eid) in posted:
+            log.info("CATCHUP: %s %s sudah terkirim, dilewati", ev.get("country"), ev.get("title"))
+            continue
+        if ev.get("actual") is None and str(eid) in overrides:
+            ev["actual"] = overrides[str(eid)]
+        if ev.get("actual") is None:
+            log.warning("CATCHUP: %s belum punya actual", ev.get("title"))
+            continue
+        if LEVEL_RANK[classify(ev)[0]] < min_rank:
+            log.info("CATCHUP: %s di bawah ambang, dilewati", ev.get("title"))
+            continue
+        log.info("CATCHUP: mengirim %s %s (%s)", ev.get("country"), ev.get("title"), ev.get("date"))
+        badge = move_badge(ev)
+        log.info("CATCHUP gerak: %s", badge["text"] if badge else "tanpa pembanding")
+        embed = release_embed(ev, evs, now)
+        log.info("CATCHUP ringkasan: %s", embed.get("description"))
+        for field in embed.get("fields") or []:
+            if field.get("name") in ("Pasar Indonesia", "Pasar Amerika", "Global"):
+                log.info("CATCHUP %s: %s", field["name"], (field.get("value") or "").replace("\n", " | "))
+        png = make_chart(ev, now)
+        if png:
+            embed["image"] = {"url": "attachment://chart.png"}
+        discord([embed], png=png)
+        posted.add(str(eid))
+    if not DRY_RUN:
+        st["posted"] = list(posted)
+        save_state(st)
+
+
 def test_send(now):
     """Kirim satu rilis berdampak SEDANG/TINGGI. State tidak diubah.
     TEST_MATCH membatasi judul, supaya tes tidak mengirim rilis lain."""
@@ -1880,6 +1933,9 @@ def main():
     now = dt.datetime.now(dt.timezone.utc)
     if TEST_SEND:
         test_send(now)
+        return
+    if CATCHUP_SEND:
+        catchup_send(now)
         return
     if PREVIEW_NOW:
         send_daily_preview(now)
