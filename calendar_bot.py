@@ -5,7 +5,7 @@ Calendar Bot: TradingView Economic Calendar -> analisis dampak ke Indonesia -> D
 Yang dilakukan setiap kali jalan (idealnya tiap 10-15 menit via GitHub Actions):
   1. Ambil kalender ekonomi TradingView (3 hari ke belakang s/d 100 hari ke depan).
   2. Kategorikan dampak ke market & ekonomi Indonesia: TINGGI / SEDANG / RENDAH.
-  3. Jadwal hanya dipantau (tidak dikirim). Opsional: SEND_PREVIEW=1 / SEND_REMINDER=1.
+  3. Jadwal harian dikirim pukul 07:00 WIB (SEND_PREVIEW). Pengingat pra-rilis tetap mati.
   4. Begitu angka actual keluar: kirim Actual vs Forecast (konsensus) vs Previous,
      bacaan sinyal makro (Indonesia, AS, global; pendek dan panjang),
      dan jadwal rilis berikutnya.
@@ -50,10 +50,13 @@ MIN_ALERT = os.getenv("MIN_ALERT", "SEDANG").upper()
 PREVIEW_HOUR = int(os.getenv("PREVIEW_HOUR_WIB", "7"))
 DRY_RUN = os.getenv("DRY_RUN") == "1"
 # Default: kalender hanya dipantau, yang dikirim ke Discord cuma hasil rilis.
-SEND_PREVIEW = os.getenv("SEND_PREVIEW", "0") == "1"    # jadwal harian
+SEND_PREVIEW = os.getenv("SEND_PREVIEW", "0") == "1"    # jadwal harian 07:00 WIB
 SEND_REMINDER = os.getenv("SEND_REMINDER", "0") == "1"  # pengingat sebelum rilis
+PREVIEW_NOW = os.getenv("PREVIEW_NOW", "0") == "1"  # kirim jadwal hari ini sekali, lalu berhenti
 TEST_SEND = os.getenv("TEST_SEND", "0") == "1"  # kirim 1 rilis terakhir sebagai tes, lalu berhenti
 TEST_MATCH = os.getenv("TEST_MATCH", "").strip()  # kalau diisi, tes hanya rilis yang judulnya cocok
+TEST_COUNTRY = os.getenv("TEST_COUNTRY", "").strip().upper()
+TEST_BACK_DAYS = int(os.getenv("TEST_BACK_DAYS", "7") or "7")
 SHEETS_URL = os.getenv("SHEETS_WEBHOOK_URL", "")
 SHEETS_TOKEN = os.getenv("SHEETS_TOKEN", "")
 BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "1830"))  # ±5 tahun riwayat untuk Google Sheets
@@ -1386,16 +1389,67 @@ def release_embed(ev, events, now):
     return _fit_embed(embed)
 
 
-def preview_embed(evs, title, color):
+def preview_embed(evs, title, color, today=None):
     lines = []
     for ev in evs:
         level, _ = classify(ev)
         t = parse_dt(ev["date"]).astimezone(WIB)
-        lines.append(f"`{t:%H:%M}` {LEVEL_STYLE[level][0]} {FLAGS.get(ev['country'], ev['country'])} "
+        stamp = f"{t:%H:%M}"
+        if today is not None and t.date() != today:
+            stamp = f"{t.day:02d} {BULAN[t.month - 1]} {t:%H:%M}"
+        lines.append(f"`{stamp}` {LEVEL_STYLE[level][0]} {FLAGS.get(ev['country'], ev['country'])} "
                      f"**{ev['title']}** — F: {fmt_val(ev, 'forecast')} | P: {fmt_val(ev, 'previous')}")
     return {"title": title, "color": color,
             "description": "\n".join(lines)[:4000] or "Tidak ada rilis penting.",
             "footer": {"text": "🔴 Tinggi · 🟠 Sedang · F = Forecast/Konsensus · P = Previous"}}
+
+
+def _on_daily_slate(ev, today):
+    """Rilis hari ini, plus besok pagi sebelum jam kirim jadwal (07:00 WIB)."""
+    when = parse_dt(ev["date"]).astimezone(WIB)
+    if when.date() == today:
+        return True
+    tomorrow = today + dt.timedelta(days=1)
+    return when.date() == tomorrow and when.hour < PREVIEW_HOUR
+
+
+def daily_preview_embeds(events, now):
+    """Satu pesan: jadwal hari ini. Senin menambah ringkasan TINGGI seminggu di pesan yang sama."""
+    today = now.astimezone(WIB).date()
+    todays = sorted(
+        (e for e in events if _on_daily_slate(e, today) and LEVEL_RANK[classify(e)[0]] >= 1),
+        key=lambda e: e["date"],
+    )
+    embeds = [preview_embed(
+        todays,
+        f"📅 Jadwal rilis hari ini · {fmt_wib(now).split(' ', 1)[1][:11]}",
+        0x3498DB,
+        today=today,
+    )]
+    embeds[0]["footer"]["text"] += " · besok pagi sebelum 07:00 WIB masuk jadwal hari sebelumnya"
+    if today.weekday() == 0:
+        week = sorted((e for e in events
+                       if 0 <= (parse_dt(e["date"]).astimezone(WIB).date() - today).days < 7
+                       and classify(e)[0] == "TINGGI"), key=lambda e: e["date"])
+        emb = preview_embed(week, "🗓️ Event berdampak TINGGI minggu ini", 0x9B59B6)
+        dated = []
+        for e, line in zip(week, emb["description"].split("\n")):
+            w = parse_dt(e["date"]).astimezone(WIB)
+            dated.append(f"{HARI[w.weekday()]}, {w.day:02d} {BULAN[w.month - 1]} · {line}")
+        emb["description"] = "\n".join(dated) if dated else emb["description"]
+        embeds.append(emb)
+    return embeds
+
+
+def send_daily_preview(now):
+    events = fetch_events(now, back_days=1, fwd_days=7)
+    embeds = daily_preview_embeds(events, now)
+    discord(embeds)
+    if not DRY_RUN:
+        st = load_state()
+        st["preview_date"] = str(now.astimezone(WIB).date())
+        save_state(st)
+    log.info("Jadwal harian terkirim (%d bagian)", len(embeds))
 
 
 # ---------------------------------------------------------------- Google Sheets
@@ -1793,11 +1847,13 @@ def test_send(now):
     """Kirim satu rilis berdampak SEDANG/TINGGI. State tidak diubah.
     TEST_MATCH membatasi judul, supaya tes tidak mengirim rilis lain."""
     min_rank = LEVEL_RANK.get(MIN_ALERT, 1)
-    evs = fetch_events(now, back_days=7, fwd_days=0)
+    evs = fetch_events(now, back_days=max(TEST_BACK_DAYS, 1), fwd_days=0)
     done = sorted((e for e in evs if e.get("actual") is not None and parse_dt(e["date"]) <= now
                    and LEVEL_RANK[classify(e)[0]] >= min_rank), key=lambda e: e["date"])
+    if TEST_COUNTRY:
+        done = [e for e in done if (e.get("country") or "").upper() == TEST_COUNTRY]
     if not done:
-        log.warning("TES: tidak ada rilis berdampak sedang/tinggi dalam 7 hari terakhir")
+        log.warning("TES: tidak ada rilis berdampak sedang/tinggi dalam %s hari terakhir", TEST_BACK_DAYS)
         return
     ev = _pick_test_event(done)
     if ev is None:
@@ -1825,6 +1881,9 @@ def main():
     if TEST_SEND:
         test_send(now)
         return
+    if PREVIEW_NOW:
+        send_daily_preview(now)
+        return
     st = load_state()
     first_run = "posted" not in st
     if st.get("backfill_version") != BACKFILL_VERSION:  # format Sheets baru -> isi ulang riwayat
@@ -1839,24 +1898,10 @@ def main():
     min_rank = LEVEL_RANK.get(MIN_ALERT, 1)
     posted, reminded = set(st["posted"]), set(st["reminded"])
 
-    # 1) jadwal harian
+    # 1) jadwal harian, sekali, pada run pertama pukul 07:00 WIB atau sesudahnya
     today = now.astimezone(WIB).date()
     if SEND_PREVIEW and now.astimezone(WIB).hour >= PREVIEW_HOUR and st.get("preview_date") != str(today):
-        todays = sorted((e for e in events
-                         if parse_dt(e["date"]).astimezone(WIB).date() == today
-                         and LEVEL_RANK[classify(e)[0]] >= 1), key=lambda e: e["date"])
-        embeds = [preview_embed(todays, f"📅 Jadwal rilis hari ini · {fmt_wib(now).split(' ', 1)[1][:11]}",
-                                0x3498DB)]
-        if today.weekday() == 0:  # Senin: tambah ringkasan event TINGGI seminggu
-            week = sorted((e for e in events
-                           if 0 <= (parse_dt(e["date"]).astimezone(WIB).date() - today).days < 7
-                           and classify(e)[0] == "TINGGI"), key=lambda e: e["date"])
-            emb = preview_embed(week, "🗓️ Event berdampak TINGGI minggu ini", 0x9B59B6)
-            emb["description"] = "\n".join(
-                f"{fmt_wib(parse_dt(e['date']))[:10]} · " + line
-                for e, line in zip(week, emb["description"].split("\n"))) if week else emb["description"]
-            embeds.append(emb)
-        discord(embeds)
+        discord(daily_preview_embeds(events, now))
         st["preview_date"] = str(today)
 
     # 2) pengingat ±30 menit sebelum event TINGGI

@@ -2,8 +2,9 @@ name: Calendar Bot (TradingView -> Discord)
 
 on:
   schedule:
-    # Hemat kuota: tiap 15 menit, Senin-Jumat, HANYA di jam rilis data (jam UTC):
-    #   00-07 UTC = 07:00-14:59 WIB -> China, Jepang, BPS, BI (RDG ~14:30 WIB)
+    # Senin–Jumat. Cron GitHub memakai UTC. 00:00 UTC = 07:00 WIB (Asia/Jakarta).
+    # Run 00:00 UTC adalah kiriman jadwal harian. preview_date menahan ulang di hari yang sama.
+    #   00-07 UTC = 07:00-14:59 WIB -> jadwal pagi, China, Jepang, BPS, BI
     #   12-15 UTC = 19:00-22:59 WIB -> data AS (CPI, NFP, PCE, GDP, ISM)
     #   18-19 UTC = 01:00-02:59 WIB -> keputusan FOMC
     - cron: "*/15 0-7,12-15,18-19 * * 1-5"
@@ -43,6 +44,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COUNTRIES: ID,US,CN,EU,JP
           MIN_ALERT: SEDANG
+          SEND_PREVIEW: "1"
+          PREVIEW_HOUR_WIB: "7"
       - name: Satu rilis ke Discord
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_send == true }}
         run: python calendar_bot.py
