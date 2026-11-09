@@ -2,7 +2,7 @@
 """
 Calendar Bot: TradingView Economic Calendar -> analisis dampak ke Indonesia -> Discord
 -------------------------------------------------------------------------------------
-Yang dilakukan setiap kali jalan (idealnya tiap 10-15 menit via GitHub Actions):
+Yang dilakukan setiap kali jalan (tiap 5 menit via GitHub Actions pada jam rilis):
   1. Ambil kalender ekonomi TradingView (3 hari ke belakang s/d 100 hari ke depan).
   2. Kategorikan dampak ke market & ekonomi Indonesia: TINGGI / SEDANG / RENDAH.
   3. Jadwal harian dikirim pukul 07:00 WIB (SEND_PREVIEW). Pengingat pra-rilis tetap mati.
@@ -394,14 +394,41 @@ def _everyday(f):
     return f"{phrase}."
 
 
+def _meaning(f):
+    """Satu kalimat arti, tanpa menyebut pasar. Horizon yang menguraikan salurannya."""
+    if f["kind"] in ("unknown", "inline"):
+        return ""
+    up = f["kind"] == "hot"
+    typ = f["typ"]
+    if typ == "unemployment":
+        return ("Bank sentral melihat lebih sedikit alasan menurunkan bunga." if up else
+                "Bank sentral melihat lebih banyak alasan mempertimbangkan bunga yang lebih rendah.")
+    if typ == "jobs":
+        return ("Permintaan perusahaan akan pekerja masih kuat, sehingga pemotongan bunga kurang mendesak." if up else
+                "Permintaan perusahaan akan pekerja lebih lemah, sehingga pemotongan bunga lebih mudah dipertimbangkan.")
+    if typ == "inflation":
+        return ("Laju harga yang lebih tinggi membuat pemotongan bunga lebih sulit." if up else
+                "Laju harga yang lebih rendah memberi ruang bagi bunga yang lebih rendah.")
+    if typ == "rate":
+        return ("Yang berubah hari ini adalah harga uang itu sendiri." if up else
+                "Yang turun hari ini adalah harga uang itu sendiri.")
+    if typ == "growth":
+        return ("Kegiatan ekonomi lebih besar daripada yang ditunggu." if up else
+                "Kegiatan ekonomi lebih kecil daripada yang ditunggu.")
+    return ""
+
+
 def rule_analysis(ev):
-    """Fakta sekali. Akibatnya ada di enam baris pasar, bukan di sini."""
+    """Fakta sekali, plus arti singkat. Enam horizon menguraikan saluran pasarnya."""
     f = _facts(ev)
     parts = [_everyday(f), f"{f['title']} {f['place']} {f['actual']} ({f['paren']})."]
+    meaning = _meaning(f)
+    if meaning:
+        parts.append(meaning)
     note = _note(f["title"])
     if note:
         parts.append(note)
-    return _clip(" ".join(parts), 500)
+    return _clip(" ".join(parts), 700)
 
 
 def _pack(id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang):
@@ -412,14 +439,14 @@ def _pack(id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_pa
 
 
 def _quiet():
-    """Pasar yang tidak bergerak, tetap disebut lengkap, bukan satu kata."""
+    """Angka sesuai perkiraan: pasar disebut satu per satu, dengan alasan mengapa tidak bergerak."""
     return _pack(
-        "Rupiah, harga SBN (surat utang negara), dan IHSG (saham Indonesia) tetap di tempat. BI tidak mengubah bunga.",
-        "Bunga BI tetap. Harga SBN dan IHSG tidak mendapat arah baru.",
-        "Bunga surat utang AS dan saham AS tetap. The Fed tidak mengubah bunga.",
-        "Bunga The Fed tetap. Saham AS tidak dihargai ulang.",
-        "Dolar tidak berubah, selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) tetap, dan perdagangan barang tidak bergeser.",
-        "Dolar dan arus perdagangan barang tetap seperti sebelumnya. Selera risiko tidak berubah.",
+        "Rupiah tetap di tempat karena selisih bunga terhadap dolar tidak berubah pada hari ini. Harga SBN (surat utang negara) tidak bergerak, sebab imbal hasil acuan tidak memberi alasan baru bagi pembeli. IHSG (saham Indonesia) tidak menilai ulang laba emiten ketika hasilnya sudah sesuai yang ditunggu. BI tidak mengubah suku bunga.",
+        "Beberapa bulan ke depan suku bunga BI tetap pada jalur yang sudah disampaikan, karena rilis ini tidak menambah tekanan pada rupiah. Harga SBN (surat utang negara) menunggu imbal hasil luar negeri sebelum harganya bergeser. IHSG (saham Indonesia) tidak mendapat arah baru selama permintaan dan biaya dana tetap seperti sebelumnya. Rupiah mengikuti dolar, bukan kejutan yang tidak muncul hari ini.",
+        "Imbal hasil surat utang Amerika Serikat tidak berubah, karena The Fed tidak memperoleh informasi baru tentang kapan bunga akan turun. Saham di sana tetap, sebab biaya pinjaman perusahaan tidak bergeser dari yang sudah ditunggu. Suku bunga kebijakan The Fed tidak diubah pada hari pengumuman. Pasar sudah memasukkan angka ini sebelum rilis keluar.",
+        "Jalur suku bunga The Fed tetap ditentukan oleh data berikutnya, bukan oleh angka yang sesuai perkiraan. Saham Amerika Serikat tidak dihargai ulang selama biaya pinjaman tidak berubah. Imbal hasil surat utang jangka pendek menunggu kejutan yang benar-benar menggeser harapan. Sampai ada kejutan itu, harga saham dan bunga utang berjalan pada jalur semula.",
+        "Dolar terhadap euro dan yen tidak bergerak, karena imbal hasil Amerika Serikat tidak berubah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) tetap, sebab biaya dana global tidak lebih mahal dan tidak lebih murah. Perdagangan barang tidak bergeser pada hari pengumuman. Pesanan ekspor tidak disusun ulang oleh angka yang sudah ditunggu.",
+        "Arus perdagangan barang tetap seperti sebelumnya, karena rilis ini tidak mengubah permintaan impor. Dolar tidak mencari arah baru selama selisih bunga antarnegara tenang. Selera risiko baru berubah setelah ada kejutan pada bunga atau pertumbuhan, bukan pada hari angka ini sesuai perkiraan. Pinjaman di luar Amerika Serikat tidak menjadi lebih mahal dan tidak menjadi lebih murah.",
     )
 
 
@@ -445,44 +472,44 @@ def _us_tighten(up, global_long_up, global_long_down):
 
 
 def _us_jobs(up):
-    """Perekrutan: tambahan tenaga kerja, bukan tingkat pengangguran."""
+    """Perekrutan: tambahan tenaga kerja, bukan jumlah orang yang mencari kerja."""
     if up:
         return _pack(
-            "Biaya dana dalam dolar tetap tinggi karena perusahaan di Amerika Serikat masih menambah tenaga kerja, sehingga rupiah melemah dan harga SBN (surat utang negara) turun. IHSG (saham Indonesia) tertekan oleh biaya dana itu, sedangkan BI tidak mengubah suku bunga pada hari yang sama.",
-            "Selama tambahan tenaga kerja menahan penurunan bunga The Fed, BI mempertahankan suku bunga. Harga SBN dan IHSG baru pulih setelah biaya dana dolar mereda.",
-            "Imbal hasil surat utang jangka pendek naik karena The Fed tidak memperoleh alasan menurunkan bunga ketika perekrutan masih kuat, dan saham yang bergantung pada pinjaman murah turun. Suku bunga kebijakan The Fed tidak berubah pada hari rilis.",
-            "The Fed mempertahankan suku bunga lebih lama selama permintaan tenaga kerja belum melemah. Saham yang membutuhkan pinjaman murah tetap tertekan sampai imbal hasil surat utang jangka pendek turun.",
-            "Dolar menguat terhadap euro dan yen karena imbal hasil Amerika Serikat tetap lebih menarik. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sedangkan arus perdagangan barang tidak berubah pada hari rilis.",
-            "Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat karena pasar tenaga kerja di sana belum longgar. Arus perdagangan barang tidak bergeser hanya oleh laporan perekrutan.",
+            "Perusahaan di Amerika Serikat masih menambah tenaga kerja, sehingga pasar menunda harapan penurunan bunga The Fed dan biaya dana dalam dolar tetap tinggi. Rupiah melemah karena dana lebih memilih imbal hasil di sana daripada aset dalam rupiah. Harga SBN (surat utang negara) turun ketika pembeli meminta imbal hasil yang lebih tinggi. IHSG (saham Indonesia) tertekan oleh biaya dana itu, sedangkan BI tidak mengubah suku bunga pada hari yang sama.",
+            "Selama perusahaan masih merekrut, The Fed menahan pemotongan bunga dan BI mempertahankan suku bunga agar selisih terhadap dolar tidak menyempit terlalu cepat. Harga SBN (surat utang negara) baru pulih setelah biaya dana dolar mereda. IHSG (saham Indonesia) tetap lebih rendah selama pinjaman luar negeri mahal, lalu membaik ketika rupiah berhenti melemah. Tekanan itu datang dari bunga di Amerika Serikat, bukan dari lowongan di dalam negeri.",
+            "Imbal hasil surat utang jangka pendek naik karena The Fed tidak memperoleh alasan menurunkan bunga ketika permintaan tenaga kerja masih kuat. Saham yang bergantung pada pinjaman murah turun, sebab biaya utang perusahaan tidak mereda pada hari rilis. Suku bunga kebijakan The Fed tidak berubah; yang bergeser adalah harapan bahwa pemotongan akan datang lebih lambat. Imbal hasil jangka pendek itu langsung menjadi patokan harga utang yang jatuh tempo dalam waktu dekat.",
+            "The Fed mempertahankan suku bunga lebih lama selama perusahaan masih mampu menambah pekerja. Saham yang membutuhkan pinjaman murah tetap tertekan sampai imbal hasil surat utang jangka pendek turun. Pemotongan baru dihitung setelah permintaan tenaga kerja melemah, bukan setelah satu bulan yang kuat. Biaya utang perusahaan mengikuti jeda itu.",
+            "Dolar menguat terhadap euro dan yen karena imbal hasil Amerika Serikat tetap lebih menarik ketika perusahaan di sana masih merekrut. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sebab pinjaman global tidak menjadi lebih murah. Arus perdagangan barang tidak berubah pada hari rilis. Pesanan ekspor tidak disusun dari laporan perekrutan.",
+            "Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat dan perusahaan di sana masih menambah pekerja. Arus perdagangan barang tidak bergeser hanya karena ada tambahan tenaga kerja. Selera risiko baru pulih setelah imbal hasil di Amerika Serikat turun. Dolar menahan biaya dana itu sampai permintaan perusahaan benar-benar melemah.",
         )
     return _pack(
-        "Peluang penurunan bunga The Fed membuka ruang bagi dana asing ke aset rupiah, sehingga rupiah menguat dan harga SBN (surat utang negara) naik. IHSG (saham Indonesia) naik karena biaya dana luar negeri mereda, dan BI tidak mengubah suku bunga pada hari yang sama.",
-        "BI memperoleh ruang menurunkan suku bunga setelah dolar mereda akibat perekrutan yang lebih lemah. Harga SBN dan IHSG menguat bersama rupiah.",
-        "Imbal hasil surat utang jangka pendek turun karena pasar mulai memperhitungkan penurunan bunga The Fed. Saham yang membutuhkan pinjaman murah naik, sedangkan suku bunga kebijakan belum diubah pada hari rilis.",
-        "The Fed menurunkan suku bunga apabila permintaan tenaga kerja tetap lemah. Saham yang bergantung pada pinjaman murah bertahan lebih tinggi selama imbal hasil surat utang rendah.",
-        "Dolar melemah terhadap euro dan yen seiring turunnya imbal hasil Amerika Serikat. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, dan perdagangan barang antarnegara tidak berubah pada hari rilis.",
-        "Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Arus barang antarnegara tidak bergeser.",
+        "Perusahaan menambah tenaga kerja lebih sedikit, sehingga peluang penurunan bunga The Fed terbuka dan biaya dana luar negeri mulai dihitung lebih rendah. Rupiah menguat ketika dana kembali melihat imbal hasil aset dalam rupiah. Harga SBN (surat utang negara) naik karena imbal hasil acuan mereda. IHSG (saham Indonesia) naik mengikuti biaya dana yang lebih ringan, sementara BI tidak mengubah suku bunga pada hari yang sama.",
+        "BI memperoleh ruang menurunkan suku bunga setelah dolar mereda akibat perekrutan yang lebih sepi. Harga SBN (surat utang negara) menguat bersama rupiah selama imbal hasil acuan tetap lebih rendah. IHSG (saham Indonesia) bertahan lebih tinggi apabila pinjaman luar negeri tidak mahal lagi. Ruang itu hilang jika perusahaan di Amerika Serikat kembali merekrut dengan cepat.",
+        "Imbal hasil surat utang jangka pendek turun karena pasar mulai memperhitungkan penurunan bunga The Fed. Saham yang membutuhkan pinjaman murah naik, sedangkan suku bunga kebijakan belum diubah pada hari rilis. Yang turun hari ini adalah harga utang di pasar, bukan keputusan rapat. Patokan bunga jangka pendek mengikuti harapan itu sampai rapat berikutnya.",
+        "The Fed menurunkan suku bunga apabila permintaan tenaga kerja tetap lemah dalam beberapa bulan. Saham yang bergantung pada pinjaman murah bertahan lebih tinggi selama imbal hasil surat utang rendah. Jika perekrutan menguat kembali, pemotongan itu ditunda dan saham yang sensitif terhadap bunga melemah lagi. Biaya utang perusahaan mengikuti jalur itu, bukan satu bulan saja.",
+        "Dolar melemah terhadap euro dan yen seiring turunnya imbal hasil Amerika Serikat. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, karena pinjaman global dihitung lebih murah. Perdagangan barang antarnegara tidak berubah pada hari rilis. Arus pesanan tidak disusun ulang hanya karena perusahaan kurang merekrut.",
+        "Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Arus barang antarnegara tidak bergeser pada hari pengumuman. Selera risiko bertahan lebih tinggi selama imbal hasil di Amerika Serikat tidak naik kembali. Dolar baru menguat jika permintaan tenaga kerja di sana pulih.",
     )
 
 
 def _us_unemployment(up):
-    """Tingkat pengangguran dan klaim: pencari kerja, bukan jumlah perekrutan."""
+    """Orang yang mencari kerja dan klaim mingguan, bukan tambahan tenaga kerja."""
     if up:
         return _pack(
-            "Pencari kerja yang lebih sedikit membuat pasar tetap mengharapkan bunga The Fed tinggi, sehingga rupiah melemah terhadap dolar. Harga SBN (surat utang negara) turun karena imbal hasil acuan luar negeri tidak mereda, IHSG (saham Indonesia) melemah, dan BI tidak menyesuaikan suku bunga hari ini.",
-            "BI menahan suku bunga selama pengangguran yang rendah di Amerika Serikat menunda pemotongan bunga The Fed. Harga SBN serta IHSG baru membaik setelah dolar tidak lagi menekan biaya dana.",
-            "Imbal hasil surat utang jangka pendek lebih tinggi karena pengangguran yang rendah mengurangi alasan The Fed memotong bunga. Saham yang sensitif terhadap bunga kebijakan melemah, dan The Fed tidak mengubah suku bunga pada hari pengumuman.",
-            "The Fed mempertahankan suku bunga dalam beberapa bulan ke depan apabila pencari kerja tetap sedikit. Saham yang bergantung pada biaya pinjaman tetap tertekan.",
-            "Permintaan terhadap dolar naik terhadap euro dan yen karena imbal hasil Amerika Serikat tetap tinggi ketika pengangguran rendah, dan minat pada aset berisiko menurun. Perdagangan barang tidak berubah pada hari yang sama, sebab data ini tidak mengubah pesanan ekspor.",
-            "Dolar yang tetap kuat membuat pinjaman di luar Amerika Serikat mahal selama pengangguran di sana rendah. Arus perdagangan barang tidak bergeser.",
+            "Orang yang mencari pekerjaan lebih sedikit, sehingga pasar tetap mengharapkan suku bunga The Fed tinggi karena bank sentral tidak melihat kelonggaran. Rupiah melemah terhadap dolar: selisih imbal hasil di Amerika Serikat tetap lebih menarik, dan dana beralih dari aset rupiah. Harga SBN (surat utang negara) turun karena imbal hasil acuan luar negeri tidak mereda dan pembeli meminta imbal hasil lebih tinggi. IHSG (saham Indonesia) melemah sebab biaya dana dalam dolar menekan valuasi, sedangkan BI tidak menyesuaikan suku bunga pada hari pengumuman.",
+            "Selama lowongan masih lebih banyak daripada orang yang mencarinya, The Fed menunda pemotongan dan BI mempertahankan suku bunga agar selisih bunga tidak menyempit terlalu cepat. Harga SBN (surat utang negara) baru membaik setelah imbal hasil acuan luar negeri turun dan tekanan pada biaya dana mereda. IHSG (saham Indonesia) tetap tertekan selama pinjaman dolar mahal, lalu pulih ketika rupiah tidak lagi melemah. Rupiah mengikuti dolar itu, bukan data tenaga kerja di dalam negeri.",
+            "Imbal hasil surat utang jangka pendek naik karena The Fed kehilangan alasan memotong bunga ketika orang yang mencari pekerjaan semakin sedikit. Saham yang sensitif terhadap bunga kebijakan melemah, sebab biaya pinjaman perusahaan tidak turun pada hari ini. The Fed tidak mengubah suku bunga kebijakan; yang bergeser adalah harapan tentang kapan pemotongan itu datang. Imbal hasil yang lebih tinggi menjadi harga baru bagi utang jangka pendek sampai ada data yang membalikkan harapan.",
+            "Dalam beberapa bulan ke depan The Fed mempertahankan suku bunga apabila lapangan kerja tetap ketat dan tidak muncul kelonggaran baru. Saham yang bergantung pada pinjaman murah tetap tertekan selama imbal hasil surat utang jangka pendek bertahan tinggi. Pemotongan baru masuk perhitungan setelah lebih banyak orang mencari pekerjaan dan tekanan upah mereda. Sampai saat itu, biaya utang perusahaan tidak turun hanya karena satu laporan.",
+            "Dolar menguat terhadap euro dan yen karena imbal hasil Amerika Serikat tetap lebih tinggi ketika pasar kerja di sana belum longgar. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sebab biaya dana global tidak mereda. Perdagangan barang tidak berubah pada hari yang sama: pesanan ekspor tidak disusun ulang hanya karena laporan tenaga kerja. Yang bergerak hari ini adalah harga uang, bukan arus barang.",
+            "Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat dan imbal hasil di sana tidak turun. Arus perdagangan barang tidak bergeser, karena data ini tidak mengubah permintaan impor maupun pesanan ekspor. Selera risiko baru pulih setelah pasar yakin bunga The Fed akan turun, bukan pada hari angkanya diumumkan. Dolar menahan biaya dana itu sampai kelonggaran di pasar kerja benar-benar terlihat.",
         )
     return _pack(
-        "Bertambahnya pencari kerja di Amerika Serikat membuka peluang bunga The Fed turun, sehingga rupiah menguat dan harga SBN (surat utang negara) naik. IHSG (saham Indonesia) naik karena biaya dana luar negeri mereda, sementara BI tidak mengubah suku bunga hari ini.",
-        "Setelah dolar mereda, BI memperoleh ruang menurunkan suku bunga. Harga SBN dan IHSG menguat selama tekanan dana asing berkurang.",
-        "Imbal hasil surat utang jangka pendek turun karena lebih banyak orang tanpa pekerjaan memberi alasan bagi The Fed untuk melonggarkan bunga. Saham yang sensitif terhadap biaya pinjaman naik, dan suku bunga kebijakan belum diubah hari ini.",
-        "The Fed menurunkan suku bunga apabila tingkat pengangguran tetap lebih tinggi. Saham yang membutuhkan pinjaman murah bertahan naik.",
-        "Dolar melemah terhadap euro dan yen seiring ekspektasi bunga Amerika Serikat yang lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, sedangkan pesanan perdagangan barang tidak berubah pada hari rilis.",
-        "Pinjaman di luar Amerika Serikat menjadi lebih murah. Arus barang antarnegara tidak berubah hanya karena data pengangguran.",
+        "Orang yang mencari pekerjaan bertambah, sehingga pasar mulai menghitung bunga The Fed lebih rendah dan biaya dana luar negeri mereda. Rupiah menguat karena selisih imbal hasil menyempit dan dana kembali ke aset dalam rupiah. Harga SBN (surat utang negara) naik ketika imbal hasil acuan turun dan pembeli menerima imbal hasil yang lebih rendah. IHSG (saham Indonesia) naik karena valuasi tidak lagi ditekan biaya dolar, sementara BI tidak mengubah suku bunga hari ini.",
+        "Setelah dolar mereda, BI memperoleh ruang menurunkan suku bunga tanpa memperlebar selisih yang sudah menyempit. Harga SBN (surat utang negara) menguat selama tekanan dana asing berkurang dan imbal hasil acuan tetap lebih rendah. IHSG (saham Indonesia) bertahan lebih tinggi apabila pinjaman luar negeri tidak mahal kembali. Ruang itu tertutup jika orang yang mencari pekerjaan di Amerika Serikat berkurang lagi.",
+        "Imbal hasil surat utang jangka pendek turun karena lebih banyak orang tanpa pekerjaan memberi alasan bagi The Fed untuk melonggarkan bunga. Saham yang sensitif terhadap biaya pinjaman naik, sebab pasar menghitung utang perusahaan lebih murah. Suku bunga kebijakan belum diubah hari ini; yang turun adalah harga utang di pasar. Patokan jangka pendek mengikuti harapan itu sampai rapat berikutnya menegaskan atau menundanya.",
+        "The Fed menurunkan suku bunga apabila kelonggaran di pasar kerja bertahan beberapa bulan, bukan hanya pada satu laporan. Saham yang membutuhkan pinjaman murah bertahan lebih tinggi selama imbal hasil surat utang tetap rendah. Jika orang yang mencari pekerjaan berkurang lagi, pemotongan ditunda dan saham yang sensitif terhadap bunga melemah. Biaya utang perusahaan mengikuti jeda keputusan itu.",
+        "Dolar melemah terhadap euro dan yen seiring harapan bunga Amerika Serikat yang lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, karena pinjaman global dihitung lebih murah. Pesanan perdagangan barang tidak berubah pada hari rilis. Arus ekspor tidak disusun ulang oleh data orang yang mencari pekerjaan.",
+        "Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Arus barang antarnegara tidak berubah hanya karena lebih banyak orang belum mendapat kerja. Selera risiko bertahan lebih tinggi selama imbal hasil di Amerika Serikat tidak naik kembali. Dolar baru menguat jika kelonggaran di pasar kerja di sana hilang.",
     )
 
 
@@ -490,41 +517,41 @@ def _us_inflation(up):
     """Harga konsumen: daya beli dan laju harga, bukan laporan tenaga kerja."""
     if up:
         return _pack(
-            "Karena harga konsumen di Amerika Serikat naik lebih cepat, pasar menunda harapan pemotongan bunga dan rupiah melemah. Harga SBN (surat utang negara) turun, IHSG (saham Indonesia) tertekan biaya dana dolar, dan BI menahan suku bunga.",
-            "BI mempertahankan suku bunga selama inflasi Amerika Serikat menahan The Fed. Harga SBN dan IHSG baru membaik setelah tekanan harga di sana mereda.",
-            "Imbal hasil surat utang jangka pendek naik karena The Fed lebih sulit menurunkan bunga ketika harga konsumen masih naik. Saham yang sensitif terhadap daya beli melemah, dan suku bunga kebijakan tidak diubah pada hari rilis.",
-            "The Fed menahan suku bunga lebih lama sampai laju harga mendekati sasaran. Saham yang bergantung pada pinjaman murah tetap tertekan selama imbal hasil itu tinggi.",
-            "Dolar menguat terhadap euro dan yen karena imbal hasil mengikuti kenaikan harga konsumen, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun. Volume perdagangan barang tidak berubah pada hari rilis.",
-            "Harga barang di luar Amerika Serikat menghadapi tekanan naik. Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat karena inflasi di sana belum reda.",
+            "Harga konsumen di Amerika Serikat naik lebih cepat, sehingga pasar menunda harapan pemotongan bunga dan biaya dana dolar tetap tinggi. Rupiah melemah karena selisih imbal hasil melebar dan dana memilih dolar. Harga SBN (surat utang negara) turun ketika pembeli meminta imbal hasil yang lebih tinggi. IHSG (saham Indonesia) tertekan biaya dana itu, dan BI menahan suku bunga agar selisih terhadap dolar tidak menyempit.",
+            "BI mempertahankan suku bunga selama laju harga di Amerika Serikat menahan The Fed dari pemotongan. Harga SBN (surat utang negara) baru naik setelah tekanan harga di sana mereda dan imbal hasil acuan turun. IHSG (saham Indonesia) tetap lebih rendah selama pinjaman dolar mahal. Rupiah baru stabil ketika pasar kembali menghitung bunga The Fed lebih rendah.",
+            "Imbal hasil surat utang jangka pendek naik karena The Fed lebih sulit menurunkan bunga ketika harga konsumen masih naik. Saham yang sensitif terhadap daya beli melemah, sebab belanja rumah tangga tergerus dan biaya pinjaman tidak turun. Suku bunga kebijakan tidak diubah pada hari rilis; yang naik adalah harga utang di pasar. Patokan jangka pendek mengikuti laju harga itu sampai ada bukti harga melambat.",
+            "The Fed menahan suku bunga lebih lama sampai laju harga mendekati sasaran. Saham yang bergantung pada pinjaman murah tetap tertekan selama imbal hasil surat utang tinggi. Pemotongan baru dihitung setelah daya beli pulih, bukan setelah satu bulan harga yang lebih tinggi. Biaya utang perusahaan mengikuti jeda itu.",
+            "Dolar menguat terhadap euro dan yen karena imbal hasil mengikuti kenaikan harga konsumen. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sebab biaya dana global tidak mereda. Volume perdagangan barang tidak berubah pada hari rilis. Pesanan ekspor tidak disusun ulang oleh laporan harga satu bulan.",
+            "Harga barang di luar Amerika Serikat menghadapi tekanan naik jika barang dari sana menjadi patokan. Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat dan laju harga di sana belum reda. Selera risiko baru pulih setelah pasar yakin bunga The Fed bisa turun. Arus perdagangan barang bergeser lebih lambat daripada harga uang.",
         )
     return _pack(
-        "Harga konsumen yang lebih tenang membuka peluang bunga The Fed turun, dan rupiah menguat. Harga SBN (surat utang negara) naik, IHSG (saham Indonesia) naik karena biaya dana mereda, dan BI memperoleh ruang menurunkan suku bunga.",
-        "BI menurunkan suku bunga setelah dolar mereda karena inflasi Amerika Serikat lebih rendah. Harga SBN tetap lebih tinggi selama laju harga di sana tenang.",
-        "Imbal hasil surat utang jangka pendek turun karena The Fed memperoleh ruang menurunkan bunga ketika harga konsumen melambat. Saham yang bergantung pada daya beli naik, dan suku bunga kebijakan belum diubah hari ini.",
-        "The Fed menurunkan suku bunga. Saham yang membutuhkan pinjaman murah menguat selama laju harga tetap lebih rendah.",
-        "Dolar melemah terhadap euro dan yen seiring imbal hasil yang turun karena harga lebih tenang, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat. Volume perdagangan barang tidak berubah pada hari rilis.",
-        "Harga barang di luar Amerika Serikat menghadapi tekanan turun. Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah.",
+        "Harga konsumen yang lebih tenang membuka peluang bunga The Fed turun, dan biaya dana dolar mulai dihitung lebih rendah. Rupiah menguat karena selisih imbal hasil menyempit. Harga SBN (surat utang negara) naik ketika pembeli menerima imbal hasil yang lebih rendah. IHSG (saham Indonesia) naik karena biaya dana mereda, dan BI memperoleh ruang menurunkan suku bunga.",
+        "BI menurunkan suku bunga setelah dolar mereda karena laju harga di Amerika Serikat lebih rendah. Harga SBN (surat utang negara) tetap lebih tinggi selama imbal hasil acuan tidak naik kembali. IHSG (saham Indonesia) bertahan naik apabila pinjaman luar negeri tetap lebih murah. Ruang itu menyempit jika harga konsumen di sana berakselerasi lagi.",
+        "Imbal hasil surat utang jangka pendek turun karena The Fed memperoleh ruang menurunkan bunga ketika harga konsumen melambat. Saham yang bergantung pada daya beli naik, sebab belanja rumah tangga tidak lagi tergerus secepat sebelumnya. Suku bunga kebijakan belum diubah hari ini; yang turun adalah harga utang di pasar. Patokan jangka pendek menunggu rapat yang mengesahkan harapan itu.",
+        "The Fed menurunkan suku bunga apabila laju harga tetap lebih rendah selama beberapa bulan. Saham yang membutuhkan pinjaman murah menguat selama imbal hasil surat utang tidak naik kembali. Jika harga konsumen berakselerasi, pemotongan ditunda dan saham yang sensitif terhadap daya beli melemah. Biaya utang perusahaan mengikuti bukti harga, bukan satu bulan yang tenang.",
+        "Dolar melemah terhadap euro dan yen seiring imbal hasil yang turun karena harga lebih tenang. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, karena pinjaman global dihitung lebih murah. Volume perdagangan barang tidak berubah pada hari rilis. Arus pesanan tidak disusun ulang oleh laporan harga satu bulan.",
+        "Harga barang di luar Amerika Serikat menghadapi tekanan yang lebih ringan. Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Selera risiko bertahan lebih tinggi selama laju harga di Amerika Serikat tidak naik lagi. Dolar baru menguat jika The Fed kehilangan alasan untuk memotong bunga.",
     )
 
 
 def _us_rates(up):
-    """Keputusan suku bunga: harga uang itu sendiri, dalam basis poin pada ringkasan."""
+    """Keputusan suku bunga: harga uang itu sendiri. Perubahan dalam basis poin ada di ringkasan."""
     if up:
         return _pack(
-            "Kenaikan suku bunga kebijakan Amerika Serikat memperlebar selisih bunga terhadap Indonesia, sehingga rupiah melemah dan harga SBN (surat utang negara) turun. IHSG (saham Indonesia) turun karena biaya dana luar negeri naik, dan BI tidak mengubah suku bunga pada hari yang sama.",
-            "BI menahan suku bunga karena bunga kebijakan Amerika Serikat lebih tinggi daripada bunga Indonesia. Harga SBN dan IHSG tetap tertekan selama selisih itu melebar.",
-            "The Fed menaikkan suku bunga kebijakan, dan imbal hasil surat utang jangka pendek naik mengikuti keputusan itu. Saham turun karena biaya pinjaman perusahaan menjadi lebih mahal.",
-            "Biaya utang perusahaan Amerika Serikat tetap lebih mahal. Saham baru pulih setelah The Fed menurunkan suku bunga kembali.",
-            "Dolar menguat karena bunga kebijakan Amerika Serikat lebih tinggi, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun. Perdagangan barang tidak berubah pada hari keputusan.",
-            "Pinjaman di luar Amerika Serikat menjadi lebih mahal. Arus perdagangan barang tidak bergeser.",
+            "Suku bunga kebijakan Amerika Serikat naik, sehingga selisih bunga terhadap Indonesia melebar dan dana memilih dolar. Rupiah melemah karena memegang rupiah menjadi kurang menarik pada hari yang sama. Harga SBN (surat utang negara) turun ketika imbal hasil di dalam negeri harus mengikuti acuan yang lebih tinggi. IHSG (saham Indonesia) turun karena biaya dana luar negeri naik, dan BI tidak mengubah suku bunga pada hari keputusan.",
+            "BI menahan suku bunga karena bunga kebijakan Amerika Serikat lebih tinggi dan pemotongan di dalam negeri akan memperlebar selisih itu. Harga SBN (surat utang negara) tetap tertekan selama imbal hasil acuan tidak turun. IHSG (saham Indonesia) baru pulih setelah biaya pinjaman dolar mereda. Rupiah mengikuti selisih bunga itu dalam beberapa bulan, bukan hanya pada hari pengumuman.",
+            "The Fed menaikkan suku bunga kebijakan, dan imbal hasil surat utang jangka pendek naik mengikuti keputusan itu pada hari yang sama. Saham turun karena biaya pinjaman perusahaan menjadi lebih mahal dan laba yang diharapkan turun. Ini keputusan harga uang, bukan laporan tenaga kerja atau harga konsumen. Patokan utang jangka pendek langsung memakai bunga kebijakan yang baru.",
+            "Biaya utang perusahaan Amerika Serikat tetap lebih mahal selama bunga kebijakan belum diturunkan kembali. Saham yang membutuhkan pinjaman baru pulih setelah The Fed memotong bunga. Imbal hasil surat utang jangka pendek bertahan tinggi selama keputusan itu tidak dibalik. Beberapa bulan ke depan ditentukan oleh rapat berikutnya, bukan oleh hari kenaikan ini.",
+            "Dolar menguat terhadap euro dan yen karena bunga kebijakan Amerika Serikat lebih tinggi daripada bunga di sana. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sebab pinjaman global menjadi lebih mahal. Perdagangan barang tidak berubah pada hari keputusan. Pesanan ekspor tidak disusun ulang oleh satu rapat bunga.",
+            "Pinjaman di luar Amerika Serikat menjadi lebih mahal selama dolar kuat dan selisih bunga tetap lebar. Arus perdagangan barang tidak bergeser pada hari keputusan. Selera risiko baru pulih setelah The Fed memberi isyarat pemotongan. Dolar menahan biaya dana itu sampai bunga kebijakan turun.",
         )
     return _pack(
-        "Penurunan suku bunga kebijakan Amerika Serikat mempersempit selisih bunga, sehingga rupiah menguat dan harga SBN (surat utang negara) naik. IHSG (saham Indonesia) naik karena biaya dana luar negeri turun, dan BI tidak mengubah suku bunga pada hari yang sama.",
-        "BI menurunkan suku bunga setelah dolar mereda akibat pelonggaran The Fed. Harga SBN dan IHSG menguat bersama rupiah.",
-        "The Fed menurunkan suku bunga kebijakan. Imbal hasil surat utang jangka pendek turun, dan saham naik karena biaya pinjaman perusahaan lebih murah.",
-        "Tagihan utang perusahaan menjadi lebih ringan. Saham yang membutuhkan pinjaman murah bertahan lebih tinggi.",
-        "Dolar melemah karena bunga kebijakan Amerika Serikat lebih rendah, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat. Perdagangan barang tidak berubah pada hari keputusan.",
-        "Pinjaman di luar Amerika Serikat menjadi lebih murah. Arus perdagangan barang tidak bergeser.",
+        "Suku bunga kebijakan Amerika Serikat turun, sehingga selisih bunga terhadap Indonesia menyempit dan dolar kurang menarik. Rupiah menguat karena imbal hasil aset dalam rupiah relatif lebih baik. Harga SBN (surat utang negara) naik ketika imbal hasil acuan mereda dan pembeli menerima imbal hasil yang lebih rendah. IHSG (saham Indonesia) naik karena biaya dana luar negeri turun, dan BI tidak mengubah suku bunga pada hari yang sama.",
+        "BI menurunkan suku bunga setelah dolar mereda akibat pelonggaran The Fed, karena selisih bunga tidak lagi menekan rupiah. Harga SBN (surat utang negara) menguat bersama rupiah selama imbal hasil acuan tetap lebih rendah. IHSG (saham Indonesia) bertahan lebih tinggi apabila pinjaman luar negeri tidak mahal kembali. Ruang itu menyempit jika The Fed menaikkan bunga lagi.",
+        "The Fed menurunkan suku bunga kebijakan, dan imbal hasil surat utang jangka pendek turun mengikuti keputusan itu. Saham naik karena biaya pinjaman perusahaan lebih murah dan proyeksi laba tidak lagi terpotong bunga. Yang berubah hari ini adalah harga uang itu sendiri. Patokan utang jangka pendek langsung memakai bunga kebijakan yang baru.",
+        "Tagihan utang perusahaan menjadi lebih ringan selama bunga kebijakan tetap lebih rendah. Saham yang membutuhkan pinjaman murah bertahan lebih tinggi sampai ada kenaikan bunga kembali. Imbal hasil surat utang jangka pendek mengikuti jalur pelonggaran itu dalam beberapa bulan. Jika inflasi atau perekrutan menguat, The Fed dapat menghentikan pemotongan dan saham yang sensitif terhadap bunga melemah.",
+        "Dolar melemah terhadap euro dan yen karena bunga kebijakan Amerika Serikat lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, sebab pinjaman global dihitung lebih murah. Perdagangan barang tidak berubah pada hari keputusan. Arus pesanan tidak disusun ulang oleh satu rapat bunga.",
+        "Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Arus perdagangan barang tidak bergeser pada hari keputusan. Selera risiko bertahan lebih tinggi selama The Fed tidak menaikkan bunga kembali. Dolar baru menguat jika selisih bunga melebar lagi.",
     )
 
 
@@ -544,68 +571,68 @@ def _market_lines(f):
     if origin == "US" and family == "guidance":
         if up:
             return _pack(
-                "Rupiah melemah, harga SBN turun, dan IHSG turun hari ini. BI tidak mengubah bunga pada hari pernyataan.",
-                "BI tidak mengubah bunga sebelum rapat The Fed. Harga SBN dan IHSG mengikuti dolar sampai rapat itu.",
-                "Bunga surat utang jangka pendek AS naik hari ini, dan saham turun. Bunga kebijakan The Fed belum berubah.",
-                "Bunga The Fed baru berubah pada rapat berikutnya. Saham mengikuti bunga surat utang sampai rapat itu.",
-                "Dolar menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah.",
-                "Dolar tetap lebih kuat kalau The Fed menahan bunga di rapat berikut. Arus perdagangan barang tidak bergeser.",
+                "Pernyataan bank sentral terdengar lebih condong menahan bunga tinggi, sehingga pasar menunda harapan pemotongan dan rupiah melemah terhadap dolar. Harga SBN (surat utang negara) turun karena imbal hasil acuan tidak mereda. IHSG (saham Indonesia) turun ketika biaya dana dolar menekan valuasi. BI tidak mengubah suku bunga pada hari pernyataan, karena keputusan bunga ada pada rapat, bukan pada kalimat hari ini.",
+                "BI tidak mengubah suku bunga sebelum rapat The Fed, sebab pernyataan saja belum menjadi keputusan. Harga SBN (surat utang negara) mengikuti dolar sampai rapat itu memberi angka bunga yang baru. IHSG (saham Indonesia) tetap tertekan selama pasar menghitung pinjaman tetap mahal. Rupiah baru stabil jika rapat berikutnya terdengar lebih lunak.",
+                "Imbal hasil surat utang jangka pendek naik karena pasar mendengar bunga akan ditahan lebih lama. Saham turun sebab biaya pinjaman yang diharapkan tidak turun. Suku bunga kebijakan The Fed belum berubah pada hari pernyataan. Yang bergerak adalah harapan, dan harapan itu menunggu rapat untuk menjadi keputusan.",
+                "Bunga The Fed baru berubah pada rapat berikutnya, bukan pada hari pernyataan ini. Saham mengikuti imbal hasil surat utang sampai rapat itu. Jika nada tetap ketat, biaya utang perusahaan bertahan tinggi selama beberapa bulan. Jika nada melunak, imbal hasil turun lebih dulu daripada keputusan bunga.",
+                "Dolar menguat terhadap euro dan yen karena imbal hasil yang diharapkan lebih tinggi. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sebab pinjaman global dihitung lebih mahal. Perdagangan barang tidak berubah pada hari pernyataan. Pesanan ekspor tidak disusun dari kalimat bank sentral.",
+                "Dolar tetap lebih kuat jika The Fed menahan bunga pada rapat berikut. Arus perdagangan barang tidak bergeser hanya karena nada pernyataan. Selera risiko baru pulih setelah ada isyarat pemotongan. Pinjaman di luar Amerika Serikat mengikuti dolar itu sampai rapat mengubahnya.",
             )
         return _pack(
-            "Rupiah menguat, harga SBN naik, dan IHSG naik hari ini. BI tidak mengubah bunga pada hari pernyataan.",
-            "BI belum menurunkan bunga sebelum rapat The Fed. Harga SBN dan IHSG mengikuti dolar sampai rapat itu.",
-            "Bunga surat utang jangka pendek AS turun hari ini, dan saham naik. Bunga kebijakan The Fed belum berubah.",
-            "Bunga The Fed baru berubah pada rapat berikutnya. Saham mengikuti bunga surat utang sampai rapat itu.",
-            "Dolar melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah.",
-            "Dolar tetap lebih lemah kalau The Fed menurunkan bunga di rapat berikut. Arus perdagangan barang tidak bergeser.",
+            "Pernyataan bank sentral terdengar lebih condong menurunkan bunga, sehingga rupiah menguat terhadap dolar. Harga SBN (surat utang negara) naik karena imbal hasil acuan yang diharapkan lebih rendah. IHSG (saham Indonesia) naik ketika biaya dana dolar dihitung lebih ringan. BI tidak mengubah suku bunga pada hari pernyataan.",
+            "BI belum menurunkan suku bunga sebelum rapat The Fed, karena pernyataan belum menjadi keputusan. Harga SBN (surat utang negara) dan IHSG (saham Indonesia) mengikuti dolar sampai rapat itu. Jika nada lunak berlanjut, biaya pinjaman luar negeri tetap lebih murah. Jika nada berbalik, rupiah kehilangan dukungan itu.",
+            "Imbal hasil surat utang jangka pendek turun karena pasar mendengar pemotongan lebih dekat. Saham naik sebab biaya pinjaman yang diharapkan lebih murah. Suku bunga kebijakan The Fed belum berubah pada hari pernyataan. Harga utang bergerak lebih dulu daripada keputusan rapat.",
+            "Bunga The Fed baru berubah pada rapat berikutnya. Saham mengikuti imbal hasil surat utang sampai rapat itu mengesahkan atau menunda harapan. Beberapa bulan ke depan ditentukan oleh keputusan, bukan oleh satu pernyataan. Biaya utang perusahaan baru benar-benar turun setelah bunga kebijakan dipotong.",
+            "Dolar melemah terhadap euro dan yen karena imbal hasil yang diharapkan lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat. Perdagangan barang tidak berubah pada hari pernyataan. Arus pesanan tidak disusun ulang oleh nada bank sentral.",
+            "Dolar tetap lebih lemah jika The Fed menurunkan bunga pada rapat berikut. Arus perdagangan barang tidak bergeser hanya karena pernyataan. Selera risiko bertahan lebih tinggi selama isyarat pemotongan tidak ditarik. Pinjaman di luar Amerika Serikat menjadi lebih murah setelah keputusan itu, bukan pada hari ini.",
         )
     if origin == "US" and family == "growth":
         if up:
             return _pack(
-                "Rupiah melemah dan harga SBN turun hari ini, sementara saham ekspor di IHSG naik. BI tidak mengubah bunga pada hari yang sama.",
-                "BI menahan bunga selama dolar kuat. Saham ekspor di IHSG tetap lebih diuntungkan daripada saham yang butuh pinjaman murah.",
-                "Saham perusahaan yang menjual barang naik hari ini, dan bunga surat utang jangka pendek ikut naik. The Fed belum mengubah bunga kebijakannya.",
-                "The Fed menahan bunga. Saham penjual barang tetap lebih kuat daripada saham yang butuh pinjaman murah.",
-                "Dolar menguat, dan selera risiko naik untuk saham barang, bukan untuk utang. Perdagangan belum berubah hari ini.",
-                "Pesanan barang dari AS bertambah. Dolar yang kuat tetap membuat pinjaman di luar AS mahal.",
+                "Permintaan di Amerika Serikat lebih kuat, sehingga dolar menarik dana dan rupiah melemah. Harga SBN (surat utang negara) turun karena imbal hasil acuan tidak mereda. Saham ekspor di IHSG (saham Indonesia) naik karena pembeli di sana mampu memesan lebih banyak, sementara saham yang bergantung pada pinjaman murah tidak ikut. BI tidak mengubah suku bunga pada hari yang sama.",
+                "BI menahan suku bunga selama dolar kuat akibat permintaan yang lebih tinggi di Amerika Serikat. Saham ekspor di IHSG (saham Indonesia) tetap lebih diuntungkan daripada saham yang butuh pinjaman murah. Harga SBN (surat utang negara) baru pulih setelah imbal hasil acuan turun. Rupiah mengikuti selisih bunga itu, bukan laba eksportir semata.",
+                "Saham perusahaan yang menjual barang naik karena pesanan lebih besar, dan imbal hasil surat utang jangka pendek ikut naik karena The Fed kurang punya alasan memotong bunga. Suku bunga kebijakan belum diubah pada hari rilis. Yang naik bersamaan adalah laba penjual barang dan harga utang. Saham yang butuh pinjaman murah tidak mendapat bantuan dari kombinasi itu.",
+                "The Fed menahan suku bunga selama permintaan tetap lebih kuat. Saham penjual barang bertahan lebih tinggi daripada saham yang butuh pinjaman murah. Imbal hasil surat utang jangka pendek tetap tinggi sampai ada tanda permintaan melambat. Beberapa bulan ke depan memisahkan dua jenis saham itu.",
+                "Dolar menguat terhadap euro dan yen karena imbal hasil mengikuti permintaan yang lebih kuat. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) naik untuk saham barang, bukan untuk utang. Perdagangan belum berubah pada hari pengumuman, karena pesanan butuh waktu untuk tercatat. Yang bergerak hari ini adalah harga aset, bukan kapal yang sudah berangkat.",
+                "Pesanan barang dari Amerika Serikat bertambah apabila permintaan ini bertahan. Dolar yang kuat tetap membuat pinjaman di luar Amerika Serikat mahal. Selera risiko pada saham barang bertahan selama pesanan tidak dibatalkan. Arus barang baru terlihat pada data perdagangan bulan berikutnya.",
             )
         return _pack(
-            "Rupiah menguat dan harga SBN naik hari ini, sementara saham ekspor di IHSG turun. BI tidak mengubah bunga pada hari yang sama.",
-            "BI menurunkan bunga setelah dolar mereda. Saham ekspor di IHSG tetap lebih lemah karena pesanan dari AS susut.",
-            "Saham perusahaan yang menjual barang turun hari ini, dan bunga surat utang jangka pendek ikut turun. The Fed belum mengubah bunga kebijakannya.",
-            "The Fed menurunkan bunga. Saham penjual barang tetap lebih lemah meskipun pinjaman lebih murah.",
-            "Dolar melemah, dan selera risiko turun untuk saham barang. Perdagangan belum berubah hari ini.",
-            "Pesanan barang dari AS berkurang. Pinjaman di luar AS jadi lebih murah mengikuti dolar yang lebih lemah.",
+            "Permintaan di Amerika Serikat lebih lemah, sehingga harapan bunga The Fed turun dan rupiah menguat. Harga SBN (surat utang negara) naik karena imbal hasil acuan mereda. Saham ekspor di IHSG (saham Indonesia) turun karena pesanan dari sana susut, meskipun biaya dana lebih ringan. BI tidak mengubah suku bunga pada hari yang sama.",
+            "BI memperoleh ruang menurunkan suku bunga setelah dolar mereda. Saham ekspor di IHSG (saham Indonesia) tetap lebih lemah karena pesanan dari Amerika Serikat susut. Harga SBN (surat utang negara) menguat bersama rupiah. Dua arah itu bisa berjalan bersama: biaya dana turun, tetapi pembeli luar lebih sedikit.",
+            "Saham perusahaan yang menjual barang turun karena pesanan lebih kecil, dan imbal hasil surat utang jangka pendek ikut turun. The Fed belum mengubah suku bunga kebijakan pada hari rilis. Yang melemah adalah prospek laba penjual barang. Yang turun pada bunga adalah harga utang, karena pemotongan menjadi lebih mungkin.",
+            "The Fed menurunkan suku bunga apabila permintaan tetap lebih lemah. Saham penjual barang tetap lebih lemah meskipun pinjaman lebih murah, karena masalahnya ada pada pesanan, bukan pada biaya bunga semata. Imbal hasil surat utang jangka pendek mengikuti pelonggaran itu. Saham yang butuh pinjaman murah mendapat bantuan yang tidak diterima oleh penjual barang.",
+            "Dolar melemah terhadap euro dan yen seiring imbal hasil yang lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) turun untuk saham barang. Perdagangan belum berubah pada hari pengumuman. Pembatalan pesanan baru tercatat pada data bulan berikutnya.",
+            "Pesanan barang dari Amerika Serikat berkurang jika permintaan ini bertahan lemah. Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Selera risiko pada saham barang baru pulih setelah pesanan kembali. Arus barang dan harga uang tidak bergerak pada hari yang sama.",
         )
     if origin == "US" and family == "activity":
         if up:
             return _pack(
-                "Rupiah melemah dan harga SBN turun hari ini, dan IHSG ikut turun. BI tidak mengubah bunga.",
-                "Bunga BI tetap. Harga SBN dan IHSG kembali kalau angka bulan depan berlawanan arah.",
-                "Saham perusahaan AS naik hari ini, dan bunga surat utang jangka pendek ikut naik. The Fed tidak mengubah bunga.",
-                "Bunga The Fed tetap. Saham AS mudah kembali ke posisi semula pada angka bulan depan.",
-                "Dolar menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah.",
-                "Dolar dan arus perdagangan barang kembali ke posisi semula kalau angka berikutnya berlawanan arah.",
+                "Survei kegiatan di Amerika Serikat lebih kuat, sehingga pasar menunda harapan pemotongan bunga dan rupiah melemah. Harga SBN (surat utang negara) turun karena imbal hasil acuan tidak mereda. IHSG (saham Indonesia) ikut turun ketika biaya dana dolar menekan valuasi. BI tidak mengubah suku bunga, karena ini gambaran satu bulan, bukan keputusan bunga.",
+                "Suku bunga BI tetap, sebab survei satu bulan belum mengubah jalur bunga di dalam negeri. Harga SBN (surat utang negara) dan IHSG (saham Indonesia) mudah kembali jika angka bulan depan berlawanan arah. Rupiah mengikuti dolar hanya selama harapan bunga The Fed tidak dilonggarkan. Data bulan berikutnya lebih menentukan daripada satu survei.",
+                "Saham perusahaan Amerika Serikat naik karena kegiatan yang disurvei lebih sibuk, dan imbal hasil surat utang jangka pendek ikut naik. The Fed tidak mengubah suku bunga pada hari rilis. Survei bukan keputusan bunga dan bukan jumlah orang yang mendapat kerja. Harga saham dan harga utang sama-sama bereaksi karena pasar membaca kegiatan yang lebih panas.",
+                "Suku bunga The Fed tetap sampai ada data yang lebih lengkap daripada satu survei. Saham Amerika Serikat mudah kembali ke posisi semula pada angka bulan depan. Imbal hasil surat utang jangka pendek juga mudah berbalik jika survei berikutnya lebih lemah. Beberapa bulan ke depan tidak ditetapkan oleh satu bulan saja.",
+                "Dolar menguat terhadap euro dan yen karena imbal hasil yang diharapkan lebih tinggi. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun. Perdagangan barang tidak berubah pada hari rilis. Survei kegiatan tidak mengubah pesanan yang sudah dikirim.",
+                "Dolar dan arus perdagangan barang kembali ke posisi semula jika angka berikutnya berlawanan arah. Selera risiko mengikuti pembalikan itu, bukan bertahan hanya karena satu bulan yang kuat. Pinjaman di luar Amerika Serikat menjadi lebih mahal hanya selama dolar ini bertahan. Data perdagangan bulan depan yang akan menunjukkan apakah barang ikut bergerak.",
             )
         return _pack(
-            "Rupiah menguat dan harga SBN naik hari ini, dan IHSG ikut naik. BI tidak mengubah bunga.",
-            "Bunga BI tetap. Harga SBN dan IHSG kembali kalau angka bulan depan berlawanan arah.",
-            "Saham perusahaan AS turun hari ini, dan bunga surat utang jangka pendek ikut turun. The Fed tidak mengubah bunga.",
-            "Bunga The Fed tetap. Saham AS mudah kembali ke posisi semula pada angka bulan depan.",
-            "Dolar melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah.",
-            "Dolar dan arus perdagangan barang kembali ke posisi semula kalau angka berikutnya berlawanan arah.",
+            "Survei kegiatan di Amerika Serikat lebih lemah, sehingga harapan bunga The Fed turun dan rupiah menguat. Harga SBN (surat utang negara) naik karena imbal hasil acuan mereda. IHSG (saham Indonesia) ikut naik ketika biaya dana dolar lebih ringan. BI tidak mengubah suku bunga pada hari rilis.",
+            "Suku bunga BI tetap, karena pelemahan satu bulan di Amerika Serikat belum menjadi alasan memotong bunga di dalam negeri. Harga SBN (surat utang negara) dan IHSG (saham Indonesia) kembali jika angka bulan depan berlawanan arah. Rupiah kehilangan dukungan jika harapan pemotongan The Fed dibatalkan. Satu survei tidak menetapkan beberapa bulan ke depan.",
+            "Saham perusahaan Amerika Serikat turun karena kegiatan yang disurvei lebih sepi, dan imbal hasil surat utang jangka pendek ikut turun. The Fed tidak mengubah suku bunga. Yang melemah adalah harapan laba jangka sangat pendek. Yang turun pada bunga adalah harga utang di pasar, bukan keputusan rapat.",
+            "Suku bunga The Fed tetap sampai data yang lebih lengkap menggesernya. Saham Amerika Serikat mudah kembali pada angka bulan depan. Imbal hasil surat utang jangka pendek juga mudah naik jika survei berikutnya lebih kuat. Jalur beberapa bulan tidak dikunci oleh satu bulan yang lemah.",
+            "Dolar melemah terhadap euro dan yen karena imbal hasil yang diharapkan lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat. Perdagangan barang tidak berubah pada hari rilis. Barang yang sudah dalam perjalanan tidak berbalik karena satu survei.",
+            "Dolar dan arus perdagangan barang kembali ke posisi semula jika angka berikutnya berlawanan arah. Selera risiko mengikuti pembalikan itu. Pinjaman di luar Amerika Serikat menjadi lebih murah hanya selama dolar ini lemah. Data bulan depan yang menunjukkan apakah pesanan benar-benar berkurang.",
         )
     if origin == "US" and family == "trade":
         lines = _quiet()
         lines["global_pendek"] = (
-            "Dolar menguat hari ini. Selera risiko tetap, dan perdagangan barang tidak berubah pada hari rilis."
+            "Dolar menguat karena neraca barang Amerika Serikat lebih baik dari yang ditunggu, sementara selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) tetap. Perdagangan barang pada hari rilis tidak berubah, sebab angka ini mencatat arus yang sudah terjadi. Imbal hasil tidak bergeser hanya karena catatan ekspor dan impor. Yang bergerak adalah harga dolar, bukan pesanan baru."
             if up else
-            "Dolar melemah hari ini. Selera risiko tetap, dan perdagangan barang tidak berubah pada hari rilis."
+            "Dolar melemah karena neraca barang Amerika Serikat lebih lemah dari yang ditunggu, sementara selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) tetap. Perdagangan barang pada hari rilis tidak berubah, sebab angka ini mencatat arus yang sudah terjadi. Imbal hasil tidak bergeser hanya karena catatan ekspor dan impor. Harga dolar yang bergerak, bukan kontrak yang baru ditandatangani."
         )
         lines["global_panjang"] = (
-            "Dolar yang lebih kuat tidak mengubah arus barang. Selera risiko tetap."
+            "Dolar yang lebih kuat tidak dengan sendirinya menambah arus barang pada bulan berikutnya. Selera risiko tetap selama bunga The Fed tidak berubah karena catatan perdagangan ini. Pinjaman di luar Amerika Serikat menjadi lebih mahal hanya jika dolar ini bertahan. Pesanan baru baru terlihat pada rilis perdagangan yang akan datang."
             if up else
-            "Dolar yang lebih lemah tidak mengubah arus barang. Selera risiko tetap."
+            "Dolar yang lebih lemah tidak dengan sendirinya mengurangi arus barang pada bulan berikutnya. Selera risiko tetap selama bunga The Fed tidak berubah karena catatan perdagangan ini. Pinjaman di luar Amerika Serikat menjadi lebih murah hanya jika dolar ini bertahan. Arah pesanan baru menunggu rilis perdagangan berikutnya."
         )
         return lines
     if origin == "US" and family == "reserves":
@@ -617,38 +644,38 @@ def _market_lines(f):
     if origin == "JP" and family == "rate":
         if up:
             return _pack(
-                "IHSG turun hari ini karena orang menjual aset yang dibiayai yen. Rupiah ikut melemah, harga SBN turun, dan BI tidak mengubah bunga.",
-                "BI tidak mengubah bunga. IHSG dan harga SBN tetap lebih berat selama pinjaman yen mahal.",
-                "Saham AS turun hari ini, dan bunga surat utang jangka panjang naik karena posisi yen ditutup. The Fed tidak mengubah bunga.",
-                "Bunga The Fed tetap. Saham AS tetap lebih rendah selama pinjaman yen mahal.",
-                "Yen menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah.",
-                "Pinjaman dalam yen jadi lebih mahal. Arus perdagangan barang tidak bergeser.",
+                "Bunga di Jepang naik, sehingga pinjaman dalam yen yang membiayai aset luar menjadi lebih mahal dan orang menutup posisi itu. IHSG (saham Indonesia) turun karena sebagian saham dibiayai yen. Rupiah ikut melemah dan harga SBN (surat utang negara) turun ketika dana ditarik untuk menutup pinjaman. BI tidak mengubah suku bunga, karena keputusan ini bukan keputusan BI.",
+                "BI tidak mengubah suku bunga hanya karena bunga yen naik. IHSG (saham Indonesia) dan harga SBN (surat utang negara) tetap lebih berat selama pinjaman yen mahal. Rupiah baru stabil setelah posisi yang dibiayai yen selesai ditutup. Tekanan beberapa bulan datang dari biaya yen, bukan dari data dalam negeri.",
+                "Saham Amerika Serikat turun karena posisi yang dibiayai yen ditutup, dan imbal hasil surat utang jangka panjang naik ketika obligasi ikut dijual. The Fed tidak mengubah suku bunga. Ini aliran dana dari Jepang, bukan laporan harga atau tenaga kerja di Amerika Serikat. Harga saham dan harga utang bergerak karena posisi ditutup, bukan karena The Fed rapat.",
+                "Suku bunga The Fed tetap. Saham Amerika Serikat bertahan lebih rendah selama pinjaman yen mahal. Imbal hasil jangka panjang mereda setelah penutupan posisi selesai. Beberapa bulan ke depan mengikuti biaya yen, bukan jalur bunga The Fed.",
+                "Yen menguat terhadap dolar karena selisih bunga Jepang menyempit dari sisi Jepang. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun ketika pinjaman yen ditutup. Perdagangan barang tidak berubah pada hari keputusan. Kapal dan pesanan tidak berbalik karena bunga yen.",
+                "Pinjaman dalam yen menjadi lebih mahal bagi pembeli aset di luar Jepang. Arus perdagangan barang tidak bergeser pada hari keputusan. Selera risiko baru pulih setelah penutupan posisi mereda. Yen yang lebih kuat menahan dana itu sampai bunga Jepang turun lagi.",
             )
         return _pack(
-            "IHSG naik hari ini karena pinjaman yen murah hidup lagi. Rupiah ikut menguat, harga SBN naik, dan BI tidak mengubah bunga.",
-            "BI tidak mengubah bunga. IHSG dan harga SBN tetap lebih tinggi selama pinjaman yen murah.",
-            "Saham AS naik hari ini. Bunga surat utang AS tidak berubah besar, dan The Fed tidak mengubah bunga.",
-            "Bunga The Fed tetap. Saham AS tetap lebih tinggi selama pinjaman yen murah.",
-            "Yen melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah.",
-            "Pinjaman dalam yen jadi lebih murah. Arus perdagangan barang tidak bergeser.",
+            "Bunga di Jepang turun, sehingga pinjaman yen murah kembali dipakai untuk membeli aset luar. IHSG (saham Indonesia) naik karena dana itu mencari saham. Rupiah ikut menguat dan harga SBN (surat utang negara) naik. BI tidak mengubah suku bunga pada hari keputusan.",
+            "BI tidak mengubah suku bunga hanya karena bunga yen turun. IHSG (saham Indonesia) dan harga SBN (surat utang negara) tetap lebih tinggi selama pinjaman yen murah. Rupiah mendapat aliran itu selama selisih bunga menguntungkan. Dukungan hilang jika Jepang menaikkan bunga kembali.",
+            "Saham Amerika Serikat naik karena dana pinjaman yen kembali mencari aset. Imbal hasil surat utang Amerika Serikat tidak berubah besar, dan The Fed tidak mengubah suku bunga. Aliran ini tidak mengubah perhitungan bunga The Fed. Yang naik adalah harga saham, bukan bunga kebijakan.",
+            "Suku bunga The Fed tetap. Saham Amerika Serikat bertahan lebih tinggi selama pinjaman yen murah. Imbal hasil tidak mengikuti yen jika The Fed tidak rapat. Beberapa bulan ke depan, saham yang dibiayai yen sensitif pada bunga Jepang, bukan hanya pada bunga The Fed.",
+            "Yen melemah karena selisih bunga membuat yen kurang menarik untuk disimpan. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat. Perdagangan barang tidak berubah pada hari keputusan. Arus barang tidak disusun dari bunga yen.",
+            "Pinjaman dalam yen menjadi lebih murah bagi pembeli aset di luar Jepang. Arus perdagangan barang tidak bergeser. Selera risiko bertahan lebih tinggi selama bunga Jepang tetap rendah. Yen baru menguat jika bank sentral Jepang menaikkan bunga lagi.",
         )
     if origin == "EU" and family == "rate":
         if up:
             return _pack(
-                "Rupiah, harga SBN, dan IHSG tidak bergerak hari ini. BI tidak mengubah bunga.",
-                "Bunga BI tetap, karena BI mengikuti The Fed, bukan bank sentral Eropa. Harga SBN dan IHSG tidak mendapat arah baru.",
-                "Bunga surat utang AS dan saham AS tidak bergerak. The Fed tidak mengubah bunga.",
-                "Bunga The Fed tetap. Saham AS tidak mengikuti keputusan Eropa.",
-                "Euro menguat dan selera risiko turun hari ini. Perdagangan barang tidak berubah.",
-                "Bunga pinjaman di Eropa naik. Dolar tetap, dan arus perdagangan barang tidak bergeser.",
+                "Bunga kebijakan Eropa naik, tetapi rupiah tidak bergerak karena selisih yang dihitung pasar adalah terhadap dolar, bukan terhadap euro. Harga SBN (surat utang negara) tidak bergerak. IHSG (saham Indonesia) tidak menilai ulang laba. BI tidak mengubah suku bunga, karena BI mengikuti The Fed, bukan bank sentral Eropa.",
+                "Suku bunga BI tetap pada jalur The Fed, bukan pada keputusan Eropa. Harga SBN (surat utang negara) dan IHSG (saham Indonesia) tidak mendapat arah baru selama dolar tenang. Rupiah baru terpengaruh jika euro yang lebih kuat menggeser dolar secara berarti. Beberapa bulan ke depan, acuan bunga Indonesia tetap bunga Amerika Serikat.",
+                "Imbal hasil surat utang Amerika Serikat dan saham di sana tidak bergerak, karena keputusan Eropa bukan alasan bagi The Fed untuk mengubah bunga. Suku bunga kebijakan The Fed tetap. Pasar memisahkan harga uang di Eropa dari harga uang di Amerika Serikat. Saham Amerika Serikat tidak dihargai ulang oleh rapat di Frankfurt.",
+                "Jalur suku bunga The Fed tetap ditentukan oleh data Amerika Serikat. Saham di sana tidak mengikuti keputusan Eropa dalam beberapa bulan. Imbal hasil surat utang Amerika Serikat baru berubah jika The Fed sendiri rapat. Keputusan Eropa tidak masuk ke perhitungan itu.",
+                "Euro menguat terhadap dolar karena bunga Eropa lebih tinggi. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun di aset Eropa yang sensitif terhadap bunga. Perdagangan barang tidak berubah pada hari keputusan. Pesanan antarnegara tidak disusun ulang oleh satu rapat.",
+                "Bunga pinjaman di Eropa naik dan biaya utang perusahaan di sana lebih mahal. Dolar tidak harus mengikuti euro. Arus perdagangan barang tidak bergeser pada hari keputusan. Selera risiko di luar Eropa pulih atau melemah mengikuti The Fed, bukan mengikuti bank sentral Eropa.",
             )
         return _pack(
-                "Rupiah, harga SBN, dan IHSG tidak bergerak hari ini. BI tidak mengubah bunga.",
-                "Bunga BI tetap. Harga SBN dan IHSG tidak mendapat arah baru dari Eropa.",
-                "Bunga surat utang AS dan saham AS tidak bergerak. The Fed tidak mengubah bunga.",
-                "Bunga The Fed tetap. Saham AS tidak mengikuti keputusan Eropa.",
-                "Euro melemah dan selera risiko naik hari ini. Perdagangan barang tidak berubah.",
-                "Bunga pinjaman di Eropa turun. Dolar tetap, dan arus perdagangan barang tidak bergeser.",
+            "Bunga kebijakan Eropa turun, tetapi rupiah, harga SBN (surat utang negara), dan IHSG (saham Indonesia) tidak bergerak karena acuan dana global tetap dolar. BI tidak mengubah suku bunga. Selisih bunga Indonesia dihitung terhadap The Fed. Keputusan Eropa tidak mengubah biaya dana dolar pada hari yang sama.",
+            "Suku bunga BI tetap. Harga SBN (surat utang negara) dan IHSG (saham Indonesia) tidak mendapat arah baru dari Eropa. Rupiah mengikuti dolar. Beberapa bulan ke depan, pelonggaran Eropa hanya terasa jika ia menggeser dolar secara berarti.",
+            "Imbal hasil surat utang Amerika Serikat dan saham di sana tidak bergerak. The Fed tidak mengubah suku bunga karena bank sentral Eropa memotong bunga. Dua keputusan itu terpisah. Saham Amerika Serikat tidak dihargai ulang oleh biaya pinjaman di Eropa.",
+            "Suku bunga The Fed tetap pada data Amerika Serikat. Saham di sana tidak mengikuti keputusan Eropa. Imbal hasil surat utang jangka pendek menunggu rapat The Fed. Pelonggaran Eropa tidak memotong bunga kebijakan di Washington.",
+            "Euro melemah karena bunga Eropa lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat pada aset Eropa yang butuh pinjaman murah. Perdagangan barang tidak berubah pada hari keputusan. Arus pesanan tidak berbalik karena satu pemotongan.",
+            "Bunga pinjaman di Eropa turun dan tagihan utang perusahaan di sana lebih ringan. Dolar tetap pada jalurnya sendiri. Arus perdagangan barang tidak bergeser pada hari keputusan. Selera risiko global tetap lebih peka pada The Fed daripada pada bank sentral Eropa.",
         )
     return _other_lines(f, up)
 
@@ -658,107 +685,107 @@ def _id_lines(f, up):
     lines = _quiet()
     if family == "rate":
         lines["id_pendek"] = (
-            "BI menaikkan suku bunga kebijakan, sehingga kredit lebih mahal dan harga SBN (surat utang negara) turun. Rupiah menguat karena selisih bunga lebih menarik, sedangkan di IHSG (saham Indonesia) saham bank diuntungkan dan saham properti tertekan."
+            "BI menaikkan suku bunga kebijakan, sehingga angsuran kredit lebih mahal pada hari yang sama. Harga SBN (surat utang negara) turun karena imbal hasil yang baru lebih tinggi dan harga obligasi bergerak berlawanan. Rupiah menguat karena selisih bunga terhadap dolar menjadi lebih menarik. Di IHSG (saham Indonesia), saham bank diuntungkan oleh selisih bunga simpanan, sedangkan saham properti tertekan oleh cicilan yang lebih berat."
             if up else
-            "BI menurunkan suku bunga kebijakan, sehingga angsuran kredit lebih ringan dan harga SBN (surat utang negara) naik. Rupiah melemah karena selisih bunga menyempit, sedangkan di IHSG (saham Indonesia) saham properti naik dan saham bank tertekan."
+            "BI menurunkan suku bunga kebijakan, sehingga angsuran kredit lebih ringan. Harga SBN (surat utang negara) naik karena imbal hasil yang baru lebih rendah. Rupiah melemah karena selisih bunga terhadap dolar menyempit dan dana dolar menjadi lebih menarik. Di IHSG (saham Indonesia), saham properti naik karena cicilan lebih ringan, sedangkan saham bank tertekan oleh selisih bunga yang lebih sempit."
         )
         lines["id_panjang"] = (
-            "Biaya pinjaman di dalam negeri tetap lebih mahal. BI baru menurunkan suku bunga setelah rupiah dinilai aman."
+            "Biaya pinjaman di dalam negeri tetap lebih mahal selama BI belum memotong bunga kembali. BI baru menurunkan suku bunga setelah rupiah dinilai aman terhadap dolar. Harga SBN (surat utang negara) mengikuti imbal hasil kebijakan itu. IHSG (saham Indonesia) yang butuh pinjaman murah baru pulih setelah cicilan turun."
             if up else
-            "Biaya pinjaman di dalam negeri lebih murah. BI tidak menurunkannya jauh di bawah The Fed, agar rupiah tidak melemah kembali."
+            "Biaya pinjaman di dalam negeri lebih murah selama pemotongan ini bertahan. BI tidak menurunkannya jauh di bawah The Fed, agar rupiah tidak melemah kembali. Harga SBN (surat utang negara) bertahan lebih tinggi selama imbal hasil tidak naik lagi. IHSG (saham Indonesia) yang sensitif terhadap cicilan mendapat dukungan itu, sedangkan saham bank tidak."
         )
     elif family == "prices":
         lines["id_pendek"] = (
-            "Kenaikan harga barang mengikis daya beli, sehingga saham konsumen di IHSG (saham Indonesia) turun dan harga SBN (surat utang negara) turun. BI menahan suku bunga, dan rupiah tidak memperoleh dukungan baru pada hari rilis."
+            "Harga barang naik lebih cepat, sehingga daya beli rumah tangga tergerus dan saham konsumen di IHSG (saham Indonesia) turun. Harga SBN (surat utang negara) turun karena pasar menghitung BI lebih sulit memotong bunga. BI menahan suku bunga agar laju harga tidak lepas. Rupiah tidak memperoleh dukungan baru pada hari rilis, karena data harga ini bukan aliran dolar."
             if up else
-            "Harga barang yang lebih tenang memulihkan daya beli, sehingga saham konsumen di IHSG (saham Indonesia) naik dan harga SBN (surat utang negara) naik. BI memperoleh ruang menurunkan suku bunga, dan rupiah tidak tertekan oleh data harga ini."
+            "Harga barang lebih tenang, sehingga daya beli pulih dan saham konsumen di IHSG (saham Indonesia) naik. Harga SBN (surat utang negara) naik karena pasar menghitung ruang pemotongan bunga. BI memperoleh ruang menurunkan suku bunga. Rupiah tidak tertekan oleh data harga ini, karena yang berubah adalah harga barang, bukan selisih bunga terhadap dolar pada hari yang sama."
         )
         lines["id_panjang"] = (
-            "Daya beli menipis dan BI menahan suku bunga. Harga SBN baru naik setelah laju harga mereda."
+            "Daya beli menipis selama harga barang tetap naik lebih cepat, dan BI menahan suku bunga. Harga SBN (surat utang negara) baru naik setelah laju harga mereda dan imbal hasil bisa turun. IHSG (saham Indonesia) yang menjual ke rumah tangga tetap lebih rendah sampai belanja pulih. Rupiah baru mendapat dukungan jika BI tidak perlu menaikkan bunga untuk menahan harga."
             if up else
-            "Daya beli pulih dan BI menurunkan suku bunga. Harga SBN tetap lebih tinggi selama harga barang tenang."
+            "Daya beli pulih dan BI menurunkan suku bunga apabila harga barang tetap tenang. Harga SBN (surat utang negara) tetap lebih tinggi selama imbal hasil tidak naik kembali. IHSG (saham Indonesia) yang menjual ke rumah tangga bertahan lebih tinggi. Rupiah tidak perlu dibela dengan bunga yang lebih tinggi selama laju harga jinak."
         )
     elif family == "labor":
         lines["id_pendek"] = (
-            "IHSG naik karena belanja rumah tangga lebih kuat. Rupiah dan harga SBN tidak bergerak hari ini, dan BI tidak mengubah bunga."
+            "Lebih banyak orang memperoleh penghasilan, sehingga belanja rumah tangga mengangkat saham konsumen di IHSG (saham Indonesia). Rupiah tidak bergerak pada hari ini karena data ini bukan aliran dolar. Harga SBN (surat utang negara) tidak bergerak, sebab BI tidak mendapat alasan baru untuk mengubah imbal hasil. BI tidak mengubah suku bunga pada hari rilis."
             if up else
-            "IHSG turun karena belanja rumah tangga lebih lemah. Rupiah ikut melemah, harga SBN turun, dan BI tidak mengubah bunga hari ini."
+            "Lebih sedikit orang memperoleh penghasilan, sehingga belanja rumah tangga melemah dan IHSG (saham Indonesia) turun. Rupiah ikut melemah jika pasar membaca kegiatan dalam negeri yang lebih sepi. Harga SBN (surat utang negara) turun ketika permintaan domestik yang lemah mengurangi minat pada aset rupiah. BI tidak mengubah suku bunga hari ini."
         )
         lines["id_panjang"] = (
-            "BI menahan bunga. Saham konsumen di IHSG tetap lebih kuat selama lowongan banyak."
+            "BI menahan suku bunga selama penghasilan rumah tangga tetap kuat dan tidak menekan harga. Saham konsumen di IHSG (saham Indonesia) tetap lebih tinggi selama lowongan banyak. Harga SBN (surat utang negara) mengikuti rupiah, yang tidak bergerak hanya karena data tenaga kerja dalam negeri. Dukungan pada saham itu hilang jika lowongan menyusut pada bulan berikutnya."
             if up else
-            "BI menurunkan bunga. Saham konsumen di IHSG tetap lebih lemah selama lowongan sepi."
+            "BI memperoleh alasan menurunkan suku bunga jika penghasilan rumah tangga tetap lemah dan harga barang tidak naik. Saham konsumen di IHSG (saham Indonesia) tetap lebih rendah selama lowongan sepi. Harga SBN (surat utang negara) baru pulih setelah kegiatan dalam negeri stabil. Rupiah mengikuti minat pada aset dalam negeri itu, bukan laporan tenaga kerja luar."
         )
     elif family == "growth":
         lines["id_pendek"] = (
-            "Permintaan dalam negeri yang lebih kuat menaikkan prospek laba emiten, sehingga IHSG (saham Indonesia) naik. Rupiah menguat karena aliran modal melihat pertumbuhan itu, harga SBN (surat utang negara) naik, dan BI tidak mengubah suku bunga pada hari rilis."
+            "Permintaan dalam negeri yang lebih kuat menaikkan prospek laba emiten, sehingga IHSG (saham Indonesia) naik pada hari pengumuman. Rupiah menguat karena aliran modal melihat kegiatan yang lebih besar dan tidak menuntut bunga yang lebih tinggi untuk tinggal. Harga SBN (surat utang negara) naik mengikuti rupiah. BI tidak mengubah suku bunga pada hari rilis, karena pertumbuhan yang lebih tinggi bukan alasan memotong atau menaikkan bunga hari itu."
             if up else
-            "Emiten kehilangan dukungan permintaan dalam negeri, dan IHSG (saham Indonesia) turun karena proyeksi laba dipangkas. Aliran modal yang lebih hati-hati melemahkan rupiah serta harga SBN (surat utang negara), sedangkan BI tidak mengubah suku bunga hari ini."
+            "Emiten kehilangan dukungan permintaan dalam negeri, dan IHSG (saham Indonesia) turun karena proyeksi laba dipangkas. Aliran modal yang lebih hati-hati melemahkan rupiah. Harga SBN (surat utang negara) turun bersama rupiah. BI tidak mengubah suku bunga hari ini, karena pelonggaran butuh rapat, bukan pengumuman pertumbuhan."
         )
         lines["id_panjang"] = (
-            "BI tidak menurunkan suku bunga hanya untuk menopang kegiatan ekonomi yang sudah berada di atas perkiraan. IHSG tetap lebih tinggi, dan harga SBN mengikuti rupiah, selama permintaan dalam negeri bertahan."
+            "BI tidak menurunkan suku bunga hanya untuk menopang kegiatan yang sudah berada di atas perkiraan. IHSG (saham Indonesia) tetap lebih tinggi selama permintaan dalam negeri bertahan dan laba emiten tidak dipangkas. Harga SBN (surat utang negara) mengikuti rupiah. Jika permintaan kembali melambat, bunga BI dan harga saham sama-sama kehilangan alasan untuk tetap."
             if up else
-            "BI menurunkan suku bunga untuk menopang kegiatan ekonomi yang melambat. IHSG tetap lebih rendah, dan harga SBN baru pulih setelah pertumbuhan stabil."
+            "BI menurunkan suku bunga untuk menopang kegiatan yang melambat, setelah rapat melihat bahwa permintaan tidak pulih sendiri. IHSG (saham Indonesia) tetap lebih rendah sampai laba emiten berhenti dipangkas. Harga SBN (surat utang negara) baru pulih setelah pertumbuhan stabil dan rupiah tidak melemah lagi. Pemotongan bunga tidak langsung mengembalikan pesanan."
         )
         lines["us_pendek"] = (
-            "Imbal hasil surat utang Amerika Serikat dan saham di sana tidak bergerak, karena pertumbuhan Indonesia bukan alasan bagi The Fed untuk mengubah bunga. The Fed tidak mengubah suku bunga kebijakan."
+            "Imbal hasil surat utang Amerika Serikat tidak bergerak, karena kegiatan di Indonesia bukan alasan bagi The Fed untuk mengubah bunga. Saham di sana juga tidak bergerak. The Fed tidak mengubah suku bunga kebijakan. Data pertumbuhan suatu negara di Asia tidak masuk ke perhitungan bunga dolar pada hari yang sama."
             if up else
-            "Saham dan imbal hasil surat utang Amerika Serikat tidak bereaksi, sebab perlambatan di Indonesia tidak mengubah perhitungan bunga The Fed. Suku bunga kebijakan The Fed tetap."
+            "Saham Amerika Serikat tidak bereaksi, sebab perlambatan di Indonesia tidak mengubah perhitungan bunga The Fed. Imbal hasil surat utang di sana tetap. Suku bunga kebijakan The Fed tidak berubah. Yang lemah adalah permintaan di dalam negeri, bukan pesanan yang menentukan laba perusahaan Amerika."
         )
         lines["us_panjang"] = (
-            "Jalur suku bunga The Fed tetap ditentukan oleh data Amerika Serikat, bukan oleh pertumbuhan Indonesia. Saham Amerika Serikat tidak dihargai ulang."
+            "Jalur suku bunga The Fed tetap ditentukan oleh data Amerika Serikat, bukan oleh pertumbuhan Indonesia. Saham Amerika Serikat tidak dihargai ulang dalam beberapa bulan karena satu pengumuman di Jakarta. Imbal hasil surat utang jangka pendek menunggu inflasi dan tenaga kerja di sana. BI dapat bergerak tanpa The Fed ikut bergerak."
         )
         lines["global_pendek"] = (
-            "Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) terhadap aset negara berkembang meningkat karena kegiatan ekonomi Indonesia lebih kuat, sementara dolar terhadap euro tidak banyak berubah. Perdagangan barang belum berubah pada hari pengumuman."
+            "Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) terhadap aset negara berkembang meningkat karena kegiatan di Indonesia lebih kuat. Dolar terhadap euro tidak banyak berubah, sebab ini bukan berita bunga Amerika Serikat. Perdagangan barang belum berubah pada hari pengumuman. Aliran modal bergerak lebih cepat daripada kapal barang."
             if up else
-            "Minat terhadap aset negara berkembang menurun ketika pertumbuhan Indonesia lebih lambat. Dolar terhadap euro hampir tidak berubah, dan arus barang belum bergeser pada hari rilis."
+            "Minat terhadap aset negara berkembang menurun ketika kegiatan di Indonesia lebih lambat. Dolar terhadap euro hampir tidak berubah. Arus barang belum bergeser pada hari rilis, karena impor bahan baku tidak dibatalkan pada hari pengumuman. Yang turun hari ini adalah harga aset, bukan volume yang sudah dimuat."
         )
         lines["global_panjang"] = (
-            "Permintaan impor bahan baku mengikuti kegiatan ekonomi yang lebih kuat. Dolar dan arus perdagangan global tidak bergeser pada hari angka ini diumumkan."
+            "Permintaan impor bahan baku mengikuti kegiatan yang lebih kuat dalam beberapa bulan, bukan pada hari angka diumumkan. Dolar dan arus perdagangan global tidak bergeser hanya karena pengumuman ini. Selera risiko pada aset negara berkembang bertahan selama kegiatan itu tidak melambat kembali. Perdagangan baru terlihat pada data bea cukai berikutnya."
             if up else
-            "Permintaan impor bahan baku menyusut mengikuti kegiatan yang lebih lambat. Dolar tidak berubah arah hanya karena pengumuman ini."
+            "Permintaan impor bahan baku menyusut mengikuti kegiatan yang lebih lambat. Dolar tidak berubah arah hanya karena pengumuman ini. Selera risiko pada aset negara berkembang baru pulih setelah kegiatan stabil. Arus barang menyesuaikan lebih lambat daripada harga saham dan harga obligasi."
         )
     elif family == "activity":
         lines["id_pendek"] = (
-            "IHSG naik hari ini. Rupiah dan harga SBN tidak bergerak, dan BI tidak mengubah bunga."
+            "Survei bulan ini lebih sibuk, sehingga IHSG (saham Indonesia) naik karena laba jangka sangat pendek dihitung lebih baik. Rupiah tidak bergerak, sebab survei bukan aliran dolar. Harga SBN (surat utang negara) tidak bergerak, karena BI tidak mendapat alasan mengubah imbal hasil dari satu bulan survei. BI tidak mengubah suku bunga."
             if up else
-            "IHSG turun hari ini. Rupiah dan harga SBN tidak bergerak, dan BI tidak mengubah bunga."
+            "Survei bulan ini lebih sepi, sehingga IHSG (saham Indonesia) turun karena laba jangka sangat pendek dihitung lebih rendah. Rupiah dan harga SBN (surat utang negara) tidak bergerak pada hari rilis. BI tidak mengubah suku bunga. Satu bulan survei belum menjadi alasan mengganti harga uang."
         )
         lines["id_panjang"] = (
-            "Bunga BI tetap. IHSG kembali kalau angka bulan depan berlawanan arah."
+            "Suku bunga BI tetap, karena survei satu bulan tidak mengubah jalur bunga. IHSG (saham Indonesia) kembali jika angka bulan depan berlawanan arah. Harga SBN (surat utang negara) dan rupiah baru ikut jika survei yang lemah atau kuat bertahan sampai mengubah harapan bunga. Sampai itu terjadi, yang bergerak hanya saham."
         )
     elif family == "trade":
         lines["id_pendek"] = (
-            "Rupiah menguat hari ini. Harga SBN naik, saham ekspor di IHSG naik, dan BI tidak mengubah bunga."
+            "Ekspor lebih unggul, sehingga devisa masuk dan rupiah menguat pada hari pengumuman. Harga SBN (surat utang negara) naik karena rupiah yang lebih kuat membuat imbal hasil rupiah lebih menarik. Saham ekspor di IHSG (saham Indonesia) naik karena penerimaan dolar emiten lebih besar. BI tidak mengubah suku bunga, sebab cadangan devisa yang masuk bukan keputusan bunga."
             if up else
-            "Rupiah melemah hari ini. Harga SBN turun, saham ekspor di IHSG turun, dan BI tidak mengubah bunga."
+            "Impor lebih unggul, sehingga devisa keluar dan rupiah melemah. Harga SBN (surat utang negara) turun ketika rupiah kurang menarik. Saham ekspor di IHSG (saham Indonesia) turun karena penerimaan luar negeri lebih tipis. BI tidak mengubah suku bunga pada hari rilis."
         )
         lines["id_panjang"] = (
-            "BI tidak mengubah bunga. Rupiah tetap lebih kuat selama uang dari luar tetap masuk."
+            "BI tidak mengubah suku bunga selama devisa dari luar tetap masuk dan rupiah tidak perlu dibela dengan bunga yang lebih tinggi. Rupiah tetap lebih kuat selama arus itu berlanjut. Harga SBN (surat utang negara) mengikuti rupiah. Saham ekspor di IHSG (saham Indonesia) kehilangan dukungan jika neraca barang berbalik."
             if up else
-            "BI menahan bunga untuk menjaga rupiah. Rupiah tetap lebih lemah selama uang dari luar tetap keluar."
+            "BI menahan suku bunga untuk menjaga rupiah selama devisa tetap keluar. Rupiah tetap lebih lemah sampai neraca barang membaik. Harga SBN (surat utang negara) ikut tertekan. Saham ekspor di IHSG (saham Indonesia) baru pulih setelah penerimaan luar negeri kembali."
         )
     elif family == "reserves":
         lines["id_pendek"] = (
-            "Rupiah menguat hari ini karena BI punya lebih banyak dolar untuk menjaganya. Harga SBN dan IHSG tidak bergerak, dan bunga BI tidak berubah."
+            "Cadangan dolar BI bertambah, sehingga rupiah menguat karena pasar melihat lebih banyak dolar yang dapat dipakai menjaga nilai tukar. Harga SBN (surat utang negara) tidak harus bergerak pada hari yang sama, sebab imbal hasil tidak diubah. IHSG (saham Indonesia) tidak bergerak, karena cadangan bukan laba emiten. Suku bunga BI tidak berubah."
             if up else
-            "Rupiah melemah hari ini karena cadangan dolar BI berkurang. Harga SBN turun, IHSG tidak bergerak, dan BI menahan bunga."
+            "Cadangan dolar BI berkurang, sehingga rupiah melemah karena pasar melihat lebih sedikit peluru untuk menjaga nilai tukar. Harga SBN (surat utang negara) turun jika pelemahan rupiah membuat imbal hasil rupiah kurang menarik. IHSG (saham Indonesia) tidak bergerak pada hari rilis. BI menahan suku bunga agar cadangan tidak terkuras lebih cepat."
         )
         lines["id_panjang"] = (
-            "BI lebih mampu menahan pelemahan rupiah. Bunga BI tetap, dan harga SBN mengikuti rupiah."
+            "BI lebih mampu menahan pelemahan rupiah selama cadangan tetap tebal. Suku bunga BI tidak perlu naik hanya untuk menjaga nilai tukar. Harga SBN (surat utang negara) mengikuti rupiah yang lebih tenang. IHSG (saham Indonesia) baru terpengaruh jika cadangan menipis sampai bunga harus naik."
             if up else
-            "BI lebih sulit menjaga rupiah tanpa menaikkan bunga. Harga SBN tetap lebih rendah selama cadangan menipis."
+            "BI lebih sulit menjaga rupiah tanpa menaikkan suku bunga apabila cadangan terus menipis. Harga SBN (surat utang negara) tetap lebih rendah selama tekanan pada rupiah berlanjut. IHSG (saham Indonesia) tertekan hanya jika bunga akhirnya naik. Cadangan yang pulih akan mengendurkan tekanan itu."
         )
     elif family == "guidance":
         lines["id_pendek"] = (
-            "Rupiah menguat dan harga SBN turun hari ini. Saham yang butuh pinjaman murah di IHSG turun. BI belum mengubah bunga pada hari pernyataan."
+            "Pernyataan BI terdengar lebih condong menahan bunga tinggi, sehingga rupiah menguat karena selisih bunga yang diharapkan lebih besar. Harga SBN (surat utang negara) turun karena imbal hasil yang diharapkan lebih tinggi. Saham yang butuh pinjaman murah di IHSG (saham Indonesia) turun. BI belum mengubah suku bunga pada hari pernyataan; yang berubah adalah harapan sebelum rapat."
             if up else
-            "Rupiah melemah dan harga SBN naik hari ini. Saham yang butuh pinjaman murah di IHSG naik. BI belum mengubah bunga pada hari pernyataan."
+            "Pernyataan BI terdengar lebih condong menurunkan bunga, sehingga rupiah melemah karena selisih bunga yang diharapkan lebih sempit. Harga SBN (surat utang negara) naik karena imbal hasil yang diharapkan lebih rendah. Saham yang butuh pinjaman murah di IHSG (saham Indonesia) naik. BI belum mengubah suku bunga pada hari pernyataan."
         )
         lines["id_panjang"] = (
-            "BI menahan bunga pada rapat berikutnya. Harga SBN dan IHSG mengikuti keputusan itu."
+            "BI menahan suku bunga pada rapat berikutnya jika nada hari ini berlanjut. Harga SBN (surat utang negara) dan IHSG (saham Indonesia) mengikuti keputusan rapat itu, bukan kalimat hari ini. Rupiah tetap lebih kuat selama selisih bunga tidak dipersempit. Jika rapat berbalik melunak, ketiga harga itu bergerak lagi."
             if up else
-            "BI menurunkan bunga pada rapat berikutnya. Harga SBN dan IHSG mengikuti keputusan itu."
+            "BI menurunkan suku bunga pada rapat berikutnya jika nada hari ini berlanjut. Harga SBN (surat utang negara) naik lebih lanjut dan saham yang butuh pinjaman murah di IHSG (saham Indonesia) bertahan lebih tinggi setelah keputusan, bukan hanya setelah pernyataan. Rupiah perlu dijaga agar pemotongan tidak memicu pelemahan. Jika rupiah melemah terlalu jauh, pemotongan dapat ditunda."
         )
     return lines
 
@@ -768,82 +795,87 @@ def _cn_lines(f, up):
     if family in ("growth", "activity"):
         if up:
             return _pack(
-                "Harga batu bara, nikel, dan sawit naik hari ini, sahamnya di IHSG naik, dan rupiah menguat. Harga SBN tidak bergerak, dan BI tidak mengubah bunga.",
-                "Ekspor Indonesia ke China bertambah. BI tidak mengubah bunga, dan harga SBN mengikuti rupiah.",
-                "Saham AS yang menjual ke Asia naik hari ini. Bunga surat utang AS tidak bergerak, dan The Fed tidak mengubah bunga.",
-                "Bunga The Fed tetap. Saham AS yang menjual ke Asia mengikuti permintaan China, bukan bunga The Fed.",
-                "Harga logam naik dan selera risiko untuk barang naik hari ini. Dolar tidak bergerak, dan perdagangan barang belum berubah pada hari rilis.",
-                "Pesanan pabrik di luar China bertambah. Dolar tidak berubah.",
+                "Permintaan di China lebih kuat, sehingga harga batu bara, nikel, dan sawit naik dan saham komoditas di IHSG (saham Indonesia) naik. Rupiah menguat karena ekspor bahan itu dibayar dalam dolar. Harga SBN (surat utang negara) tidak bergerak pada hari pengumuman, sebab BI tidak mengubah imbal hasil. BI tidak mengubah suku bunga; yang berubah adalah harga barang tambang, bukan harga uang di dalam negeri.",
+                "Ekspor Indonesia ke China bertambah apabila permintaan ini bertahan beberapa bulan. BI tidak mengubah suku bunga hanya karena pesanan dari China. Harga SBN (surat utang negara) mengikuti rupiah jika devisa ekspor benar-benar masuk. IHSG (saham Indonesia) yang menjual komoditas kehilangan dukungan jika permintaan China berbalik.",
+                "Saham Amerika Serikat yang menjual ke Asia naik karena pembeli di China dihitung lebih mampu. Imbal hasil surat utang Amerika Serikat tidak bergerak. The Fed tidak mengubah suku bunga, karena kegiatan di China bukan data harga atau tenaga kerja di Amerika Serikat. Yang naik adalah saham eksportir, bukan harga utang dolar.",
+                "Suku bunga The Fed tetap pada data Amerika Serikat. Saham yang menjual ke Asia mengikuti permintaan China, bukan bunga The Fed. Imbal hasil surat utang jangka pendek tidak ikut naik hanya karena pabrik di China lebih sibuk. Beberapa bulan ke depan, saham eksportir dan bunga dolar tetap berjalan pada alasan yang berbeda.",
+                "Harga logam naik, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) untuk barang naik. Dolar terhadap euro tidak bergerak, karena ini bukan berita bunga Amerika Serikat. Perdagangan barang belum berubah pada hari rilis. Kontrak tambang bergerak lebih cepat daripada kapal yang mengangkutnya.",
+                "Pesanan pabrik di luar China bertambah jika permintaan ini bertahan. Dolar tidak berubah arah hanya karena kegiatan di China. Selera risiko pada barang bertahan selama harga logam tidak jatuh kembali. Arus perdagangan baru tercatat pada data bea cukai, bukan pada hari pengumuman.",
             )
         return _pack(
-            "Harga batu bara, nikel, dan sawit turun hari ini, sahamnya di IHSG turun, dan rupiah melemah. Harga SBN turun, dan BI tidak mengubah bunga.",
-            "Ekspor Indonesia ke China berkurang. BI tidak mengubah bunga, dan harga SBN mengikuti rupiah.",
-            "Saham AS yang menjual ke Asia turun hari ini. Bunga surat utang AS tidak bergerak, dan The Fed tidak mengubah bunga.",
-            "Bunga The Fed tetap. Saham AS yang menjual ke Asia mengikuti permintaan China, bukan bunga The Fed.",
-            "Harga logam turun dan selera risiko untuk barang turun hari ini. Dolar tidak bergerak, dan perdagangan barang belum berubah pada hari rilis.",
-            "Pesanan pabrik di luar China berkurang. Dolar tidak berubah.",
+            "Permintaan di China lebih lemah, sehingga harga batu bara, nikel, dan sawit turun dan saham komoditas di IHSG (saham Indonesia) turun. Rupiah melemah karena devisa ekspor bahan itu dihitung lebih kecil. Harga SBN (surat utang negara) turun mengikuti rupiah. BI tidak mengubah suku bunga pada hari pengumuman.",
+            "Ekspor Indonesia ke China berkurang jika permintaan tetap lemah. BI tidak mengubah suku bunga hanya karena pesanan China menyusut. Harga SBN (surat utang negara) mengikuti rupiah selama devisa lebih sedikit. IHSG (saham Indonesia) yang menjual komoditas baru pulih setelah harga barang tambang naik kembali.",
+            "Saham Amerika Serikat yang menjual ke Asia turun karena pembeli di China dihitung lebih hati-hati. Imbal hasil surat utang Amerika Serikat tidak bergerak. The Fed tidak mengubah suku bunga. Pelemahan permintaan di China tidak masuk ke perhitungan bunga dolar pada hari yang sama.",
+            "Suku bunga The Fed tetap. Saham yang menjual ke Asia mengikuti permintaan China, bukan jalur bunga The Fed. Imbal hasil surat utang tidak turun hanya karena pabrik di China lebih sepi. Beberapa bulan ke depan, saham eksportir dan bunga The Fed bergerak karena alasan yang berbeda.",
+            "Harga logam turun, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) untuk barang turun. Dolar terhadap euro tidak bergerak. Perdagangan barang belum berubah pada hari rilis, karena muatan yang sudah berangkat tidak berbalik. Yang turun hari ini adalah harga kontrak, bukan volume yang sudah tercatat.",
+            "Pesanan pabrik di luar China berkurang jika permintaan tetap lemah. Dolar tidak berubah arah. Selera risiko pada barang baru pulih setelah harga logam naik kembali. Arus perdagangan menyesuaikan pada data bulan berikutnya.",
         )
     if family == "rate":
         if up:
             return _pack(
-                "Harga batu bara, nikel, dan sawit turun hari ini, dan sahamnya di IHSG turun. Rupiah melemah, harga SBN ikut turun, dan BI tidak mengubah bunga.",
-                "Ekspor Indonesia ke China berkurang. BI tidak mengubah bunga.",
-                "Saham AS yang menjual ke Asia turun hari ini. Bunga surat utang AS dan The Fed tidak berubah.",
-                "Bunga The Fed tetap. Saham AS tidak mengikuti bunga China.",
-                "Harga logam turun dan selera risiko untuk barang turun hari ini. Dolar tidak bergerak.",
-                "Pinjaman di China jadi lebih mahal. Arus perdagangan barang di luar China menyusut.",
+                "Bunga di China naik, sehingga permintaan bahan tambang dihitung lebih lemah. Harga batu bara, nikel, dan sawit turun, dan sahamnya di IHSG (saham Indonesia) turun. Rupiah melemah karena devisa ekspor itu lebih kecil, dan harga SBN (surat utang negara) ikut turun. BI tidak mengubah suku bunga, karena keputusan ini bukan keputusan BI.",
+                "Ekspor Indonesia ke China berkurang jika pinjaman di sana tetap lebih mahal. BI tidak mengubah suku bunga hanya karena biaya dana di China. Harga SBN (surat utang negara) mengikuti rupiah selama devisa lebih sedikit. IHSG (saham Indonesia) yang menjual komoditas baru pulih setelah permintaan China kembali.",
+                "Saham Amerika Serikat yang menjual ke Asia turun karena pembeli di China menghadapi bunga yang lebih mahal. Imbal hasil surat utang Amerika Serikat tidak berubah. The Fed tidak mengubah suku bunga. Bunga di China tidak masuk ke perhitungan bunga dolar pada hari yang sama.",
+                "Suku bunga The Fed tetap pada data Amerika Serikat. Saham di sana tidak mengikuti bunga China dalam beberapa bulan. Imbal hasil surat utang jangka pendek menunggu rapat The Fed. Dua harga uang itu tidak bergerak bersama hanya karena satu keputusan di China.",
+                "Harga logam turun, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) untuk barang turun. Dolar terhadap euro tidak bergerak. Perdagangan barang belum berubah pada hari keputusan, karena pesanan yang sudah ada tidak dibatalkan seketika. Yang turun adalah harga kontrak tambang.",
+                "Pinjaman di China menjadi lebih mahal dan proyek yang butuh kredit menunda pembelian. Arus perdagangan barang di luar China menyusut lebih lambat daripada harga logam. Selera risiko pada barang pulih setelah bunga di China turun kembali. Dolar tidak harus menguat hanya karena keputusan ini.",
             )
         return _pack(
-            "Harga batu bara, nikel, dan sawit naik hari ini, dan sahamnya di IHSG naik. Rupiah menguat, harga SBN ikut naik, dan BI tidak mengubah bunga.",
-            "Ekspor Indonesia ke China bertambah. BI tidak mengubah bunga.",
-            "Saham AS yang menjual ke Asia naik hari ini. Bunga surat utang AS dan The Fed tidak berubah.",
-            "Bunga The Fed tetap. Saham AS tidak mengikuti bunga China.",
-            "Harga logam naik dan selera risiko untuk barang naik hari ini. Dolar tidak bergerak.",
-            "Pinjaman di China jadi lebih murah. Arus perdagangan barang di luar China bertambah.",
+            "Bunga di China turun, sehingga permintaan bahan tambang dihitung lebih kuat. Harga batu bara, nikel, dan sawit naik, dan sahamnya di IHSG (saham Indonesia) naik. Rupiah menguat karena devisa ekspor dihitung lebih besar, dan harga SBN (surat utang negara) ikut naik. BI tidak mengubah suku bunga pada hari keputusan.",
+            "Ekspor Indonesia ke China bertambah jika pinjaman di sana tetap lebih murah. BI tidak mengubah suku bunga hanya karena biaya dana di China. Harga SBN (surat utang negara) mengikuti rupiah selama devisa masuk. IHSG (saham Indonesia) yang menjual komoditas kehilangan dukungan jika bunga China naik lagi.",
+            "Saham Amerika Serikat yang menjual ke Asia naik karena kredit di China lebih murah bagi pembeli. Imbal hasil surat utang Amerika Serikat dan suku bunga The Fed tidak berubah. Keputusan bunga China bukan data yang dipakai The Fed pada hari yang sama. Yang naik adalah saham eksportir, bukan harga utang dolar.",
+            "Suku bunga The Fed tetap. Saham Amerika Serikat yang menjual ke Asia mengikuti permintaan China, bukan jalur The Fed. Imbal hasil surat utang tidak turun hanya karena bunga di China lebih rendah. Beberapa bulan ke depan, kedua bank sentral itu berjalan sendiri-sendiri.",
+            "Harga logam naik, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) untuk barang naik. Dolar terhadap euro tidak bergerak. Perdagangan barang belum berubah pada hari keputusan. Kontrak bertanda lebih dulu daripada muatan kapal.",
+            "Pinjaman di China menjadi lebih murah dan pembelian bahan baku di luar China bertambah jika pelonggaran ini bertahan. Arus perdagangan tidak berubah pada hari keputusan. Selera risiko pada barang bertahan selama bunga tidak naik kembali. Dolar tetap pada jalurnya sendiri.",
         )
     if family == "prices":
         if up:
             return _pack(
-                "Harga SBN, rupiah, dan IHSG tidak bergerak hari ini. BI tidak mengubah bunga.",
-                "Ekspor Indonesia ke China tidak bertambah. Harga SBN dan bunga BI tetap.",
-                "Bunga surat utang AS dan saham AS tidak bergerak. The Fed tidak mengubah bunga.",
-                "Bunga The Fed tetap. Saham AS tidak mengikuti harga di China.",
-                "Harga barang dari China naik. Dolar dan selera risiko tidak berubah hari ini.",
-                "Bunga di China tetap tinggi. Arus perdagangan barang baru berubah setelah harga ini bertahan.",
+                "Harga konsumen di China naik lebih cepat, tetapi harga SBN (surat utang negara), rupiah, dan IHSG (saham Indonesia) tidak bergerak pada hari rilis. BI tidak mengubah suku bunga. Data harga di China bukan selisih bunga dolar dan bukan laba emiten Indonesia pada hari yang sama. Pasar dalam negeri menunggu apakah harga itu mengubah permintaan barang tambang.",
+                "Ekspor Indonesia ke China tidak otomatis bertambah hanya karena harga di sana lebih tinggi. Harga SBN (surat utang negara) dan suku bunga BI tetap. IHSG (saham Indonesia) baru bergerak jika permintaan bahan baku benar-benar berubah. Rupiah mengikuti devisa, bukan laporan harga China hari ini.",
+                "Imbal hasil surat utang Amerika Serikat dan saham di sana tidak bergerak. The Fed tidak mengubah suku bunga karena harga konsumen China bukan data harga di Amerika Serikat. Dua laju harga itu tidak dicampur pada hari rilis. Saham Amerika Serikat tidak dihargai ulang.",
+                "Suku bunga The Fed tetap pada inflasi dan tenaga kerja di Amerika Serikat. Saham di sana tidak mengikuti harga di China dalam beberapa bulan. Imbal hasil surat utang jangka pendek menunggu data domestik. Laporan harga China tidak menggeser rapat The Fed.",
+                "Harga barang dari China naik, sehingga barang impor yang memakai patokan itu menghadapi tekanan naik. Dolar tidak berubah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) tidak berubah pada hari rilis, karena ini laporan harga, bukan keputusan bunga. Perdagangan barang belum disusun ulang.",
+                "Bunga di China tetap tinggi jika laju harga tidak mereda, dan pembelian kredit menjadi lebih mahal. Arus perdagangan barang baru berubah setelah harga ini bertahan beberapa bulan. Dolar tidak harus menguat. Selera risiko pada barang menunggu bukti bahwa permintaan benar-benar menyusut.",
             )
         return _pack(
-            "Harga batu bara, nikel, dan sawit naik hari ini, sahamnya di IHSG naik. Rupiah menguat, dan BI tidak mengubah bunga hari ini.",
-            "Ekspor Indonesia ke China bertambah. Harga SBN naik mengikuti rupiah.",
-            "Bunga surat utang AS dan saham AS tidak bergerak. The Fed tidak mengubah bunga.",
-            "Bunga The Fed tetap. Saham AS tidak mengikuti harga di China.",
-            "Harga barang dari China turun, dan selera risiko untuk barang naik hari ini. Dolar tidak bergerak.",
-            "Bunga di China turun. Pesanan barang dari China bertambah.",
+            "Harga konsumen di China lebih tenang, sehingga pasar menghitung bunga di sana lebih mudah turun dan permintaan bahan tambang lebih longgar. Harga batu bara, nikel, dan sawit naik, dan sahamnya di IHSG (saham Indonesia) naik. Rupiah menguat karena devisa ekspor dihitung lebih besar. BI tidak mengubah suku bunga pada hari rilis.",
+            "Ekspor Indonesia ke China bertambah jika harga yang lebih tenang membuka pelonggaran bunga di sana. Harga SBN (surat utang negara) naik mengikuti rupiah. IHSG (saham Indonesia) yang menjual komoditas bertahan lebih tinggi selama permintaan tidak berbalik. BI tidak memotong bunga hanya karena harga di China melambat.",
+            "Imbal hasil surat utang Amerika Serikat dan saham di sana tidak bergerak. The Fed tidak mengubah suku bunga. Harga yang lebih tenang di China bukan bukti harga di Amerika Serikat melambat. Saham Amerika Serikat tidak mengikuti laporan itu.",
+            "Suku bunga The Fed tetap pada data domestik. Saham Amerika Serikat tidak mengikuti harga di China. Imbal hasil surat utang jangka pendek tidak turun hanya karena laju harga di China lebih rendah. Beberapa bulan ke depan, The Fed membaca harga dan tenaga kerja di negaranya.",
+            "Harga barang dari China turun, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) untuk barang naik karena bahan baku dihitung lebih murah. Dolar tidak bergerak. Perdagangan barang belum berubah pada hari rilis. Harga kontrak bergerak lebih dulu daripada volume yang tercatat.",
+            "Bunga di China lebih mudah turun jika laju harga tetap tenang, dan pesanan barang dari China bertambah. Arus perdagangan menyesuaikan dalam beberapa bulan, bukan pada hari pengumuman. Dolar tetap. Selera risiko pada barang bertahan selama harga tidak naik kembali.",
         )
     if family == "labor":
         lines = _quiet()
         lines["id_panjang"] = (
-            "Ekspor barang jadi Indonesia ke China bertambah. Bunga BI, harga SBN, dan rupiah tidak berubah karenanya."
+            "Ekspor barang jadi Indonesia ke China bertambah jika lebih banyak orang di sana berpenghasilan dan belanja bertahan. Suku bunga BI, harga SBN (surat utang negara), dan rupiah tidak berubah hanya karena data tenaga kerja China. IHSG (saham Indonesia) yang menjual ke konsumen China baru bergerak setelah pesanan tercatat. Satu bulan lapangan kerja tidak mengganti harga uang di dalam negeri."
             if up else
-            "Ekspor barang jadi Indonesia ke China berkurang. Bunga BI, harga SBN, dan rupiah tidak berubah karenanya."
+            "Ekspor barang jadi Indonesia ke China berkurang jika lebih banyak orang di sana kehilangan penghasilan. Suku bunga BI, harga SBN (surat utang negara), dan rupiah tidak berubah hanya karena data itu. IHSG (saham Indonesia) yang menjual ke konsumen China melemah setelah pesanan menyusut, bukan pada hari pengumuman. BI tidak memotong bunga karena lapangan kerja di China."
+        )
+        lines["global_panjang"] = (
+            "Permintaan barang konsumen dari China menguat jika penghasilan di sana bertahan. Dolar tidak berubah arah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) pada barang konsumsi naik lebih lambat daripada harga saham. Arus perdagangan baru terlihat pada data bulan berikutnya."
+            if up else
+            "Permintaan barang konsumen dari China melemah jika penghasilan di sana tetap lebih rendah. Dolar tidak berubah arah. Selera risiko pada barang konsumsi menurun setelah pesanan dibatalkan, bukan pada hari angka keluar. Arus perdagangan menyesuaikan pada data berikutnya."
         )
         return lines
     if family == "guidance":
         if up:
             return _pack(
-                "Harga batu bara, nikel, dan sawit turun hari ini, dan sahamnya di IHSG turun. Rupiah dan harga SBN tidak bergerak, dan BI tidak mengubah bunga.",
-                "Ekspor Indonesia ke China berkurang kalau pinjaman di China ikut mengetat. BI tidak mengubah bunga.",
-                "Saham AS yang menjual ke Asia turun hari ini. Bunga surat utang AS dan The Fed tidak berubah.",
-                "Bunga The Fed tetap. Saham AS tidak mengikuti pernyataan China.",
-                "Harga logam turun dan selera risiko untuk barang turun hari ini. Dolar tidak bergerak.",
-                "Bunga di China belum berubah pada hari pernyataan. Arus perdagangan baru berubah setelah bunga itu benar-benar naik.",
+                "Pernyataan bank sentral China terdengar lebih ketat, sehingga harga batu bara, nikel, dan sawit turun dan sahamnya di IHSG (saham Indonesia) turun. Rupiah dan harga SBN (surat utang negara) tidak bergerak pada hari pernyataan, karena bunga di China belum benar-benar naik. BI tidak mengubah suku bunga. Yang berubah adalah harapan atas permintaan bahan tambang.",
+                "Ekspor Indonesia ke China berkurang jika pinjaman di China ikut mengetat setelah rapat. BI tidak mengubah suku bunga hanya karena nada pernyataan di China. Harga SBN (surat utang negara) mengikuti rupiah apabila devisa benar-benar menyusut. IHSG (saham Indonesia) yang menjual komoditas baru pulih jika nada itu melunak.",
+                "Saham Amerika Serikat yang menjual ke Asia turun karena pembeli China dihitung lebih hati-hati. Imbal hasil surat utang Amerika Serikat tidak berubah. The Fed tidak mengubah suku bunga. Pernyataan di China bukan data yang dipakai rapat The Fed.",
+                "Suku bunga The Fed tetap. Saham Amerika Serikat tidak mengikuti pernyataan China dalam beberapa bulan. Imbal hasil surat utang menunggu data domestik. Nada bank sentral China tidak memotong atau menaikkan bunga dolar.",
+                "Harga logam turun, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) untuk barang turun. Dolar tidak bergerak. Perdagangan barang tidak berubah pada hari pernyataan. Pesanan yang sudah ditandatangani tidak dibatalkan oleh satu kalimat.",
+                "Bunga di China belum berubah pada hari pernyataan. Arus perdagangan baru berubah setelah bunga itu benar-benar naik. Selera risiko pada barang pulih jika rapat berikutnya lebih lunak. Dolar tetap pada selisih bunga Amerika Serikat.",
             )
         return _pack(
-            "Harga batu bara, nikel, dan sawit naik hari ini, dan sahamnya di IHSG naik. Rupiah menguat, harga SBN ikut naik, dan BI tidak mengubah bunga.",
-            "Ekspor Indonesia ke China bertambah kalau pinjaman di China ikut murah. BI tidak mengubah bunga.",
-            "Saham AS yang menjual ke Asia naik hari ini. Bunga surat utang AS dan The Fed tidak berubah.",
-            "Bunga The Fed tetap. Saham AS tidak mengikuti pernyataan China.",
-            "Harga logam naik dan selera risiko untuk barang naik hari ini. Dolar tidak bergerak.",
-            "Bunga di China belum berubah pada hari pernyataan. Arus perdagangan baru berubah setelah bunga itu benar-benar turun.",
+            "Pernyataan bank sentral China terdengar lebih lunak, sehingga harga batu bara, nikel, dan sawit naik dan sahamnya di IHSG (saham Indonesia) naik. Rupiah menguat dan harga SBN (surat utang negara) ikut naik karena devisa ekspor dihitung lebih besar. BI tidak mengubah suku bunga pada hari pernyataan. Harapan permintaan bergerak lebih dulu daripada keputusan bunga.",
+            "Ekspor Indonesia ke China bertambah jika pinjaman di China benar-benar lebih murah setelah rapat. BI tidak mengubah suku bunga hanya karena nada itu. Harga SBN (surat utang negara) mengikuti rupiah. IHSG (saham Indonesia) yang menjual komoditas kehilangan dukungan jika rapat berbalik lebih ketat.",
+            "Saham Amerika Serikat yang menjual ke Asia naik. Imbal hasil surat utang Amerika Serikat dan suku bunga The Fed tidak berubah. Pernyataan China bukan alasan The Fed mengubah bunga. Yang naik adalah saham eksportir, bukan harga utang dolar.",
+            "Suku bunga The Fed tetap. Saham Amerika Serikat tidak mengikuti pernyataan China sebagai jalur bunga. Imbal hasil surat utang jangka pendek menunggu data Amerika Serikat. Beberapa bulan ke depan, permintaan China dan bunga The Fed tetap dua cerita yang berbeda.",
+            "Harga logam naik, dan selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) untuk barang naik. Dolar tidak bergerak. Perdagangan barang tidak berubah pada hari pernyataan. Kontrak tambang bergerak lebih cepat daripada kapal.",
+            "Bunga di China belum berubah pada hari pernyataan. Arus perdagangan baru berubah setelah bunga itu benar-benar turun. Selera risiko pada barang bertahan jika pelonggaran dikonfirmasi. Dolar tidak melemah hanya karena nada bank sentral China.",
         )
     return _quiet()
 
@@ -853,23 +885,23 @@ def _other_lines(f, up):
     lines = _quiet()
     if family in ("prices", "labor", "rate", "guidance"):
         lines["global_pendek"] = (
-            f"Dolar tidak bergerak dan selera risiko global tetap. Bunga di {place} naik, dan perdagangan barang tidak berubah hari ini."
+            f"Dolar terhadap euro tidak bergerak, karena keputusan atau data di {place} bukan berita bunga Amerika Serikat. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) global tetap. Bunga di {place} naik, dan biaya utang di sana lebih mahal pada hari rilis. Perdagangan barang tidak berubah, sebab pesanan antarnegara tidak disusun ulang oleh satu pengumuman."
             if up else
-            f"Dolar tidak bergerak dan selera risiko global tetap. Bunga di {place} turun, dan perdagangan barang tidak berubah hari ini."
+            f"Dolar terhadap euro tidak bergerak, karena data di {place} bukan berita bunga Amerika Serikat. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) global tetap. Bunga atau tekanan harga di {place} lebih rendah pada hari rilis. Perdagangan barang tidak berubah, karena arus yang sudah berjalan tidak berbalik hari ini."
         )
         lines["global_panjang"] = (
-            f"Bunga di {place} tetap lebih tinggi. Dolar, selera risiko, dan arus perdagangan barang tidak ikut."
+            f"Bunga di {place} tetap lebih tinggi selama beberapa bulan jika data ini tidak berbalik. Dolar, selera risiko, dan arus perdagangan barang global tidak ikut hanya karena harga uang di sana. Pinjaman di {place} lebih mahal bagi perusahaan setempat. Pasar Indonesia dan Amerika Serikat tetap membaca BI dan The Fed."
             if up else
-            f"Bunga di {place} tetap lebih rendah. Dolar, selera risiko, dan arus perdagangan barang tidak ikut."
+            f"Bunga di {place} tetap lebih rendah jika pelonggaran ini bertahan. Dolar, selera risiko, dan arus perdagangan barang global tidak ikut. Pinjaman di {place} lebih murah bagi perusahaan setempat. Acuan dana global tetap bunga The Fed, bukan bunga di {place}."
         )
     elif family in ("growth", "activity"):
         lines["global_pendek"] = (
-            f"Dolar dan selera risiko global tidak berubah hari ini. Perdagangan dengan {place} belum berubah pada hari rilis."
+            f"Dolar tidak berubah, karena kegiatan di {place} bukan alasan mengubah bunga Amerika Serikat. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) global tidak berubah pada hari rilis. Perdagangan dengan {place} belum berubah, sebab pesanan butuh waktu untuk tercatat. Yang boleh bergerak hari ini adalah harga aset yang menjual ke sana, bukan volume kapal."
         )
         lines["global_panjang"] = (
-            f"Pesanan dari {place} bertambah. Dolar dan selera risiko tidak ikut berubah."
+            f"Pesanan dari {place} bertambah jika kegiatan ini bertahan beberapa bulan. Dolar dan selera risiko global tidak ikut berubah hanya karena satu pengumuman. Arus barang baru terlihat pada data perdagangan berikutnya. BI dan The Fed tidak mengubah suku bunga karena permintaan di {place}."
             if up else
-            f"Pesanan dari {place} berkurang. Dolar dan selera risiko tidak ikut berubah."
+            f"Pesanan dari {place} berkurang jika kegiatan tetap lebih lemah. Dolar dan selera risiko global tidak ikut berubah pada hari pengumuman. Arus barang menyusut lebih lambat daripada harga saham. Suku bunga BI dan The Fed tetap pada data mereka sendiri, bukan pada {place}."
         )
     return lines
 
@@ -888,7 +920,7 @@ def _strip_fact(f, text):
 def market_views(ev):
     f = _facts(ev)
     lines = _market_lines(f)
-    return {k: _clip(_strip_fact(f, lines.get(k)), 520) for k in MARKET_KEYS}
+    return {k: _clip(_strip_fact(f, lines.get(k)), 720) for k in MARKET_KEYS}
 
 def build_macro_read(ev):
     read = market_views(ev)
@@ -953,17 +985,20 @@ def llm_analysis(ev, level, read, next_txt):
         "(lebih banyak orang dapat kerja, harga naik lebih cepat, bunga lebih tinggi). "
         "Jangan tulis akibat ke rupiah, bunga, saham, atau dolar di ringkasan.\n"
         "id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang: "
-        "masing-masing SATU atau DUA kalimat pendek, padat, dan lengkap. Keenamnya harus berbeda bentuknya.\n"
+        "masing-masing TIGA sampai LIMA kalimat utuh. Jangan satu atau dua kalimat. "
+        "Jangan dipotong di tengah. Keenamnya harus berbeda bentuk kalimatnya.\n"
+        "Setiap horizon memuat tiga hal: arah geraknya, mengapa itu terjadi untuk jenis indikator ini, "
+        "dan salurannya. Indonesia: rupiah, SBN (surat utang negara), IHSG (saham Indonesia), dan BI. "
+        "Amerika: imbal hasil surat utang, saham, dan The Fed. "
+        "Global: dolar, selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti), "
+        "dan perdagangan barang.\n"
         "Jangan ulang pola yang sama seperti 'IHSG naik, rupiah naik' di setiap horizon. "
-        "Untuk setiap akibat, sebutkan sebabnya dan kaitkan dengan jenis indikator ini. "
         "Data tenaga kerja, pertumbuhan, inflasi, dan suku bunga tidak boleh memakai kalimat yang sama.\n"
         "Jangan ulang nama indikator. Jangan ulang kalimat fakta dari ringkasan. "
         "Jangan pakai biasanya, bisa, atau kalimat pengisi.\n"
-        "Indonesia: sebut rupiah, SBN (surat utang negara), IHSG (saham Indonesia), dan BI.\n"
-        "Amerika: sebut bunga surat utang, saham, dan The Fed.\n"
-        "Global: sebut dolar, selera risiko (minat menaruh uang di aset yang untungnya tidak pasti), dan perdagangan barang.\n"
         "Jangka pendek artinya hari rilis. Jangka panjang artinya beberapa bulan ke depan.\n"
-        "Kalau suatu harga tidak bergerak, katakan di dalam kalimat yang sama, jangan sebagai pengumuman terpisah yang kosong.\n\n"
+        "Kalau suatu harga tidak bergerak, jelaskan mengapa di dalam kalimat yang utuh, "
+        "bukan sebagai pengumuman satu kata.\n\n"
         f"Data: {json.dumps(payload, ensure_ascii=False)}\n"
         f"Kategori dampak ke Indonesia: {level}\n"
         f"Rilis berikutnya: {next_txt}\n"
@@ -975,7 +1010,7 @@ def llm_analysis(ev, level, read, next_txt):
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01",
                      "content-type": "application/json"},
-            json={"model": CLAUDE_MODEL, "max_tokens": 1400,
+            json={"model": CLAUDE_MODEL, "max_tokens": 2400,
                   "messages": [{"role": "user", "content": prompt}]},
             timeout=60,
         )
@@ -991,16 +1026,16 @@ def llm_analysis(ev, level, read, next_txt):
 
 
 def _market_fields(read):
+    """Satu kolom per horizon supaya beberapa kalimat tidak terpotong batas 1024 karakter Discord."""
     rows = (
-        ("Pasar Indonesia", "id_pendek", "id_panjang"),
-        ("Pasar Amerika", "us_pendek", "us_panjang"),
-        ("Global", "global_pendek", "global_panjang"),
+        ("Indonesia · jangka pendek", "id_pendek"),
+        ("Indonesia · jangka panjang", "id_panjang"),
+        ("Amerika · jangka pendek", "us_pendek"),
+        ("Amerika · jangka panjang", "us_panjang"),
+        ("Global · jangka pendek", "global_pendek"),
+        ("Global · jangka panjang", "global_panjang"),
     )
-    return [{
-        "name": name,
-        "value": f"Jangka pendek: {read[a]}\nJangka panjang: {read[b]}",
-        "inline": False,
-    } for name, a, b in rows]
+    return [{"name": name, "value": _clip(read[key], 1000), "inline": False} for name, key in rows]
 
 
 def _embed_weight(embed):
@@ -1884,7 +1919,7 @@ def catchup_send(now):
         embed = release_embed(ev, evs, now)
         log.info("CATCHUP ringkasan: %s", embed.get("description"))
         for field in embed.get("fields") or []:
-            if field.get("name") in ("Pasar Indonesia", "Pasar Amerika", "Global"):
+            if "jangka" in (field.get("name") or ""):
                 log.info("CATCHUP %s: %s", field["name"], (field.get("value") or "").replace("\n", " | "))
         png = make_chart(ev, now)
         if png:
@@ -1918,7 +1953,7 @@ def test_send(now):
     embed["title"] = "🧪 TES · " + embed["title"]
     log.info("TES ringkasan: %s", embed.get("description"))
     for field in embed.get("fields") or []:
-        if field.get("name") in ("Actual", "Pasar Indonesia", "Pasar Amerika", "Global"):
+        if field.get("name") in ("Actual",) or "jangka" in (field.get("name") or ""):
             log.info("TES %s: %s", field["name"], (field.get("value") or "").replace("\n", " | "))
     png = make_chart(ev, now)
     if png:
