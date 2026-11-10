@@ -401,14 +401,20 @@ def _meaning(f):
     up = f["kind"] == "hot"
     typ = f["typ"]
     if typ == "unemployment":
-        return ("Bank sentral melihat lebih sedikit alasan menurunkan bunga." if up else
-                "Bank sentral melihat lebih banyak alasan mempertimbangkan bunga yang lebih rendah.")
+        gloss = "Ini hitungan orang yang sedang mencari kerja dan belum mendapatkannya, bukan jumlah lowongan baru."
+        why = ("Bank sentral melihat lebih sedikit alasan menurunkan bunga." if up else
+               "Bank sentral melihat lebih banyak alasan mempertimbangkan bunga yang lebih rendah.")
+        return f"{gloss} {why}"
     if typ == "jobs":
-        return ("Permintaan perusahaan akan pekerja masih kuat, sehingga pemotongan bunga kurang mendesak." if up else
-                "Permintaan perusahaan akan pekerja lebih lemah, sehingga pemotongan bunga lebih mudah dipertimbangkan.")
+        gloss = "Ini jumlah orang yang baru dipekerjakan, bukan persentase yang belum mendapat kerja."
+        why = ("Perusahaan masih membutuhkan pekerja, sehingga pemotongan bunga kurang mendesak." if up else
+               "Perusahaan menambah pekerja lebih sedikit, sehingga pemotongan bunga lebih mudah dipertimbangkan.")
+        return f"{gloss} {why}"
     if typ == "inflation":
-        return ("Laju harga yang lebih tinggi membuat pemotongan bunga lebih sulit." if up else
-                "Laju harga yang lebih rendah memberi ruang bagi bunga yang lebih rendah.")
+        gloss = "Ini harga barang yang dibeli rumah tangga di toko, bukan harga di pabrik."
+        why = ("Kenaikan yang lebih cepat membuat pemotongan bunga lebih sulit." if up else
+               "Kenaikan yang lebih lambat memberi ruang bagi bunga yang lebih rendah.")
+        return f"{gloss} {why}"
     if typ == "rate":
         return ("Yang berubah hari ini adalah harga uang itu sendiri." if up else
                 "Yang turun hari ini adalah harga uang itu sendiri.")
@@ -496,41 +502,41 @@ def _us_unemployment(up):
     """Orang yang mencari kerja dan klaim mingguan, bukan tambahan tenaga kerja."""
     if up:
         return _pack(
-            "Orang yang mencari pekerjaan lebih sedikit, sehingga pasar tetap mengharapkan suku bunga The Fed tinggi karena bank sentral tidak melihat kelonggaran. Rupiah melemah terhadap dolar: selisih imbal hasil di Amerika Serikat tetap lebih menarik, dan dana beralih dari aset rupiah. Harga SBN (surat utang negara) turun karena imbal hasil acuan luar negeri tidak mereda dan pembeli meminta imbal hasil lebih tinggi. IHSG (saham Indonesia) melemah sebab biaya dana dalam dolar menekan valuasi, sedangkan BI tidak menyesuaikan suku bunga pada hari pengumuman.",
-            "Selama lowongan masih lebih banyak daripada orang yang mencarinya, The Fed menunda pemotongan dan BI mempertahankan suku bunga agar selisih bunga tidak menyempit terlalu cepat. Harga SBN (surat utang negara) baru membaik setelah imbal hasil acuan luar negeri turun dan tekanan pada biaya dana mereda. IHSG (saham Indonesia) tetap tertekan selama pinjaman dolar mahal, lalu pulih ketika rupiah tidak lagi melemah. Rupiah mengikuti dolar itu, bukan data tenaga kerja di dalam negeri.",
-            "Imbal hasil surat utang jangka pendek naik karena The Fed kehilangan alasan memotong bunga ketika orang yang mencari pekerjaan semakin sedikit. Saham yang sensitif terhadap bunga kebijakan melemah, sebab biaya pinjaman perusahaan tidak turun pada hari ini. The Fed tidak mengubah suku bunga kebijakan; yang bergeser adalah harapan tentang kapan pemotongan itu datang. Imbal hasil yang lebih tinggi menjadi harga baru bagi utang jangka pendek sampai ada data yang membalikkan harapan.",
-            "Dalam beberapa bulan ke depan The Fed mempertahankan suku bunga apabila lapangan kerja tetap ketat dan tidak muncul kelonggaran baru. Saham yang bergantung pada pinjaman murah tetap tertekan selama imbal hasil surat utang jangka pendek bertahan tinggi. Pemotongan baru masuk perhitungan setelah lebih banyak orang mencari pekerjaan dan tekanan upah mereda. Sampai saat itu, biaya utang perusahaan tidak turun hanya karena satu laporan.",
-            "Dolar menguat terhadap euro dan yen karena imbal hasil Amerika Serikat tetap lebih tinggi ketika pasar kerja di sana belum longgar. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sebab biaya dana global tidak mereda. Perdagangan barang tidak berubah pada hari yang sama: pesanan ekspor tidak disusun ulang hanya karena laporan tenaga kerja. Yang bergerak hari ini adalah harga uang, bukan arus barang.",
-            "Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat dan imbal hasil di sana tidak turun. Arus perdagangan barang tidak bergeser, karena data ini tidak mengubah permintaan impor maupun pesanan ekspor. Selera risiko baru pulih setelah pasar yakin bunga The Fed akan turun, bukan pada hari angkanya diumumkan. Dolar menahan biaya dana itu sampai kelonggaran di pasar kerja benar-benar terlihat.",
+            "Kejutan ini penting karena The Fed memotong bunga ketika banyak orang belum mendapat kerja, dan hari ini alasan itu melemah. Bunga dolar yang tetap tinggi membuat menyimpan dolar lebih untung daripada menyimpan rupiah, sehingga rupiah melemah. Pembeli SBN (surat utang negara) meminta bunga lebih tinggi agar tidak kalah dari bunga dolar, dan harga SBN turun karena harga utang bergerak berlawanan dengan bunga yang diminta. Saham di IHSG (saham Indonesia) tertekan karena laba perusahaan dihitung dengan biaya pinjaman yang lebih mahal, sedangkan BI tidak mengubah bunga hari ini sebab keputusannya tidak mengikuti satu laporan dari luar.",
+            "Beberapa bulan ke depan The Fed baru memotong bunga jika pelamar kerja bertambah, jadi selisih bunga BI terhadap dolar tidak menyempit. BI mempertahankan bunganya supaya menaruh uang di rupiah tidak kalah menarik dari dolar. Harga SBN baru naik setelah bunga dolar turun dan pembeli tidak lagi meminta tambahan. IHSG pulih belakangan, ketika pinjaman luar negeri mereda, bukan pada hari angka ini diumumkan.",
+            "Bunga surat utang jangka pendek, yaitu bunga bagi pembeli utang yang segera jatuh tempo, naik karena pasar menggeser tanggal pemotongan The Fed ke belakang. Saham yang hidup dari pinjaman murah turun, sebab cicilan utang perusahaan tidak menjadi lebih ringan hari ini. The Fed tidak mengubah bunga kebijakannya; yang berubah adalah harga utang di pasar, sebelum rapat. Perusahaan juga kurang terdorong menurunkan tawaran upah ketika pelamar lebih sedikit, dan itu menahan pelonggaran.",
+            "Pemotongan bunga baru masuk jadwal jika jumlah orang yang belum bekerja tetap tinggi selama beberapa bulan dan kenaikan upah mereda. Sampai syarat itu terpenuhi, bunga utang jangka pendek tetap menjadi biaya pinjaman yang lebih mahal. Saham yang butuh utang baru tetap lebih rendah karena proyeksi labanya memakai bunga yang lebih tinggi. Satu bulan dengan pengangguran yang turun tidak cukup untuk membalik jalur itu.",
+            "Dolar menguat terhadap euro dan yen karena bunga di Amerika Serikat tetap lebih tinggi daripada bunga di Eropa dan Jepang. Selera risiko (minat menaruh dana pada aset yang hasilnya tidak pasti) menurun, karena pinjaman untuk membeli aset itu tidak lebih murah. Dampak langsung ke arus barang kecil. Yang lebih cepat terasa adalah harga uang dan biaya pinjaman.",
+            "Utang di luar Amerika Serikat yang dihitung dalam dolar menjadi lebih mahal selama dolar kuat. Arus barang baru menyusut jika perusahaan di sana mengurangi pesanan karena biaya dana, dan itu baru terlihat beberapa bulan kemudian. Minat pada aset yang hasilnya tidak pasti pulih setelah ada keyakinan bunga The Fed akan turun, bukan pada hari pengumuman. Selama pelamar kerja tetap sedikit, alasan untuk penurunan bunga itu belum ada.",
         )
     return _pack(
-        "Orang yang mencari pekerjaan bertambah, sehingga pasar mulai menghitung bunga The Fed lebih rendah dan biaya dana luar negeri mereda. Rupiah menguat karena selisih imbal hasil menyempit dan dana kembali ke aset dalam rupiah. Harga SBN (surat utang negara) naik ketika imbal hasil acuan turun dan pembeli menerima imbal hasil yang lebih rendah. IHSG (saham Indonesia) naik karena valuasi tidak lagi ditekan biaya dolar, sementara BI tidak mengubah suku bunga hari ini.",
-        "Setelah dolar mereda, BI memperoleh ruang menurunkan suku bunga tanpa memperlebar selisih yang sudah menyempit. Harga SBN (surat utang negara) menguat selama tekanan dana asing berkurang dan imbal hasil acuan tetap lebih rendah. IHSG (saham Indonesia) bertahan lebih tinggi apabila pinjaman luar negeri tidak mahal kembali. Ruang itu tertutup jika orang yang mencari pekerjaan di Amerika Serikat berkurang lagi.",
-        "Imbal hasil surat utang jangka pendek turun karena lebih banyak orang tanpa pekerjaan memberi alasan bagi The Fed untuk melonggarkan bunga. Saham yang sensitif terhadap biaya pinjaman naik, sebab pasar menghitung utang perusahaan lebih murah. Suku bunga kebijakan belum diubah hari ini; yang turun adalah harga utang di pasar. Patokan jangka pendek mengikuti harapan itu sampai rapat berikutnya menegaskan atau menundanya.",
-        "The Fed menurunkan suku bunga apabila kelonggaran di pasar kerja bertahan beberapa bulan, bukan hanya pada satu laporan. Saham yang membutuhkan pinjaman murah bertahan lebih tinggi selama imbal hasil surat utang tetap rendah. Jika orang yang mencari pekerjaan berkurang lagi, pemotongan ditunda dan saham yang sensitif terhadap bunga melemah. Biaya utang perusahaan mengikuti jeda keputusan itu.",
-        "Dolar melemah terhadap euro dan yen seiring harapan bunga Amerika Serikat yang lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, karena pinjaman global dihitung lebih murah. Pesanan perdagangan barang tidak berubah pada hari rilis. Arus ekspor tidak disusun ulang oleh data orang yang mencari pekerjaan.",
-        "Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Arus barang antarnegara tidak berubah hanya karena lebih banyak orang belum mendapat kerja. Selera risiko bertahan lebih tinggi selama imbal hasil di Amerika Serikat tidak naik kembali. Dolar baru menguat jika kelonggaran di pasar kerja di sana hilang.",
+        "Kejutan ini penting karena bertambahnya orang yang belum mendapat kerja memberi The Fed alasan menimbang bunga yang lebih rendah. Bunga dolar yang dihitung lebih rendah membuat menyimpan rupiah tidak kalah menarik, sehingga rupiah menguat. Pembeli SBN (surat utang negara) menerima bunga yang lebih rendah, dan harga SBN naik karena harga utang naik ketika bunga yang diminta turun. Saham di IHSG (saham Indonesia) naik karena biaya pinjaman luar negeri yang lebih ringan memperbaiki hitungan laba, sementara BI tidak mengubah bunga hari ini.",
+        "BI memperoleh ruang menurunkan bunga setelah dolar mereda, sebab selisih bunga terhadap dolar tidak lagi menekan rupiah. Harga SBN bertahan lebih tinggi selama bunga dolar tidak naik kembali. IHSG menjaga kenaikan itu apabila pinjaman luar negeri tetap lebih murah. Ruang tersebut tertutup jika pelamar kerja di Amerika Serikat berkurang lagi.",
+        "Bunga surat utang jangka pendek turun karena pasar memajukan tanggal pemotongan The Fed. Saham yang membutuhkan pinjaman murah naik, sebab cicilan utang perusahaan dihitung lebih ringan. Bunga kebijakan belum diubah hari ini; yang turun adalah harga utang di pasar. Rapat berikutnya yang mengesahkan atau menunda harapan itu.",
+        "The Fed menurunkan bunga apabila pelamar tetap banyak selama beberapa bulan, bukan karena satu laporan. Saham yang butuh pinjaman murah bertahan lebih tinggi selama bunga utang tetap rendah. Jika pelamar menyusut lagi, pemotongan ditunda dan saham yang peka terhadap bunga melemah. Biaya utang perusahaan mengikuti jeda keputusan itu.",
+        "Dolar melemah terhadap euro dan yen karena bunga Amerika Serikat yang diharapkan lebih rendah. Selera risiko (minat menaruh dana pada aset yang hasilnya tidak pasti) meningkat, sebab pinjaman untuk membeli aset itu dihitung lebih murah. Pesanan barang tidak berubah pada hari rilis. Kontrak ekspor tidak disusun ulang oleh data pelamar kerja.",
+        "Pinjaman dalam dolar di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Arus barang tidak berubah hanya karena lebih banyak orang belum mendapat kerja. Minat pada aset yang hasilnya tidak pasti bertahan selama bunga di Amerika Serikat tidak naik kembali. Dolar menguat lagi jika pelamar di sana menyusut.",
     )
 
 
 def _us_inflation(up):
-    """Harga konsumen: daya beli dan laju harga, bukan laporan tenaga kerja."""
+    """Harga barang di toko: daya beli, bukan laporan tenaga kerja."""
     if up:
         return _pack(
-            "Harga konsumen di Amerika Serikat naik lebih cepat, sehingga pasar menunda harapan pemotongan bunga dan biaya dana dolar tetap tinggi. Rupiah melemah karena selisih imbal hasil melebar dan dana memilih dolar. Harga SBN (surat utang negara) turun ketika pembeli meminta imbal hasil yang lebih tinggi. IHSG (saham Indonesia) tertekan biaya dana itu, dan BI menahan suku bunga agar selisih terhadap dolar tidak menyempit.",
-            "BI mempertahankan suku bunga selama laju harga di Amerika Serikat menahan The Fed dari pemotongan. Harga SBN (surat utang negara) baru naik setelah tekanan harga di sana mereda dan imbal hasil acuan turun. IHSG (saham Indonesia) tetap lebih rendah selama pinjaman dolar mahal. Rupiah baru stabil ketika pasar kembali menghitung bunga The Fed lebih rendah.",
-            "Imbal hasil surat utang jangka pendek naik karena The Fed lebih sulit menurunkan bunga ketika harga konsumen masih naik. Saham yang sensitif terhadap daya beli melemah, sebab belanja rumah tangga tergerus dan biaya pinjaman tidak turun. Suku bunga kebijakan tidak diubah pada hari rilis; yang naik adalah harga utang di pasar. Patokan jangka pendek mengikuti laju harga itu sampai ada bukti harga melambat.",
-            "The Fed menahan suku bunga lebih lama sampai laju harga mendekati sasaran. Saham yang bergantung pada pinjaman murah tetap tertekan selama imbal hasil surat utang tinggi. Pemotongan baru dihitung setelah daya beli pulih, bukan setelah satu bulan harga yang lebih tinggi. Biaya utang perusahaan mengikuti jeda itu.",
-            "Dolar menguat terhadap euro dan yen karena imbal hasil mengikuti kenaikan harga konsumen. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) menurun, sebab biaya dana global tidak mereda. Volume perdagangan barang tidak berubah pada hari rilis. Pesanan ekspor tidak disusun ulang oleh laporan harga satu bulan.",
-            "Harga barang di luar Amerika Serikat menghadapi tekanan naik jika barang dari sana menjadi patokan. Pinjaman di luar Amerika Serikat tetap mahal selama dolar kuat dan laju harga di sana belum reda. Selera risiko baru pulih setelah pasar yakin bunga The Fed bisa turun. Arus perdagangan barang bergeser lebih lambat daripada harga uang.",
+            "Kejutan ini penting karena The Fed sulit memotong bunga ketika belanja rumah tangga tergerus harga yang naik lebih cepat. Bunga dolar yang tetap tinggi membuat rupiah kalah menarik, sehingga rupiah melemah. Pembeli SBN (surat utang negara) meminta bunga lebih tinggi sebagai ganti, dan harga SBN turun. Saham konsumen di IHSG (saham Indonesia) tertekan dari dua arah: pembeli di dalam negeri tidak langsung terpengaruh, tetapi biaya pinjaman dolar yang lebih mahal memotong hitungan laba, dan BI menahan bunga agar selisih terhadap dolar tidak menyempit.",
+            "BI mempertahankan bunga selama harga di Amerika Serikat menahan The Fed dari pemotongan. Harga SBN baru naik setelah laju harga di sana mereda dan bunga dolar turun. IHSG yang menjual ke rumah tangga menunggu daya beli di dalam negeri, sedangkan saham yang berutang dalam dolar menunggu biaya dana itu mereda. Rupiah stabil kembali ketika pasar kembali menghitung bunga The Fed lebih rendah.",
+            "Bunga surat utang jangka pendek naik karena bukti harga di toko menjauhkan pemotongan The Fed. Saham perusahaan yang menjual barang ke rumah tangga melemah, sebab pembeli mengurangi jumlah barang, bukan hanya karena bunga. Bunga kebijakan tidak diubah pada hari rilis; yang naik adalah harga utang di pasar. Patokan utang jangka pendek mengikuti laju harga itu sampai ada bulan yang lebih tenang.",
+            "The Fed menahan bunga lebih lama sampai kenaikan harga mendekati sasaran yang sudah disampaikan. Saham yang butuh pinjaman murah tetap tertekan selama bunga utang tinggi, terpisah dari saham yang lemah karena pembeli berhemat. Pemotongan baru dihitung setelah daya beli pulih, bukan setelah satu bulan yang mahal. Biaya utang perusahaan mengikuti jeda itu.",
+            "Dolar menguat terhadap euro dan yen karena bunga mengikuti harga barang yang lebih cepat naik. Selera risiko (minat menaruh dana pada aset yang hasilnya tidak pasti) menurun, sebab pinjaman global tidak lebih murah. Volume barang yang dikirim tidak berubah pada hari rilis. Pesanan ekspor tidak disusun ulang oleh laporan harga satu bulan.",
+            "Barang dari Amerika Serikat yang menjadi patokan harga di negara lain menghadapi tekanan naik. Pinjaman dalam dolar tetap mahal selama dolar kuat dan harga di sana belum reda. Minat pada aset yang hasilnya tidak pasti pulih setelah pasar yakin The Fed dapat memotong bunga. Arus perdagangan bergeser lebih lambat daripada harga uang.",
         )
     return _pack(
-        "Harga konsumen yang lebih tenang membuka peluang bunga The Fed turun, dan biaya dana dolar mulai dihitung lebih rendah. Rupiah menguat karena selisih imbal hasil menyempit. Harga SBN (surat utang negara) naik ketika pembeli menerima imbal hasil yang lebih rendah. IHSG (saham Indonesia) naik karena biaya dana mereda, dan BI memperoleh ruang menurunkan suku bunga.",
-        "BI menurunkan suku bunga setelah dolar mereda karena laju harga di Amerika Serikat lebih rendah. Harga SBN (surat utang negara) tetap lebih tinggi selama imbal hasil acuan tidak naik kembali. IHSG (saham Indonesia) bertahan naik apabila pinjaman luar negeri tetap lebih murah. Ruang itu menyempit jika harga konsumen di sana berakselerasi lagi.",
-        "Imbal hasil surat utang jangka pendek turun karena The Fed memperoleh ruang menurunkan bunga ketika harga konsumen melambat. Saham yang bergantung pada daya beli naik, sebab belanja rumah tangga tidak lagi tergerus secepat sebelumnya. Suku bunga kebijakan belum diubah hari ini; yang turun adalah harga utang di pasar. Patokan jangka pendek menunggu rapat yang mengesahkan harapan itu.",
-        "The Fed menurunkan suku bunga apabila laju harga tetap lebih rendah selama beberapa bulan. Saham yang membutuhkan pinjaman murah menguat selama imbal hasil surat utang tidak naik kembali. Jika harga konsumen berakselerasi, pemotongan ditunda dan saham yang sensitif terhadap daya beli melemah. Biaya utang perusahaan mengikuti bukti harga, bukan satu bulan yang tenang.",
-        "Dolar melemah terhadap euro dan yen seiring imbal hasil yang turun karena harga lebih tenang. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) meningkat, karena pinjaman global dihitung lebih murah. Volume perdagangan barang tidak berubah pada hari rilis. Arus pesanan tidak disusun ulang oleh laporan harga satu bulan.",
-        "Harga barang di luar Amerika Serikat menghadapi tekanan yang lebih ringan. Pinjaman di luar Amerika Serikat menjadi lebih murah mengikuti dolar yang lebih lemah. Selera risiko bertahan lebih tinggi selama laju harga di Amerika Serikat tidak naik lagi. Dolar baru menguat jika The Fed kehilangan alasan untuk memotong bunga.",
+        "Kejutan ini penting karena harga di toko yang lebih tenang mengembalikan daya beli dan memberi The Fed ruang memotong bunga. Bunga dolar yang dihitung lebih rendah membuat rupiah menguat. Pembeli SBN (surat utang negara) menerima bunga yang lebih rendah, dan harga SBN naik. Saham di IHSG (saham Indonesia) naik karena biaya pinjaman mereda, dan BI memperoleh ruang menurunkan bunga tanpa memperlebar selisih terhadap dolar.",
+        "BI menurunkan bunga setelah dolar mereda karena harga di Amerika Serikat lebih tenang. Harga SBN tetap lebih tinggi selama bunga acuan tidak naik kembali. IHSG bertahan naik apabila pinjaman luar negeri tetap lebih murah. Ruang itu menyempit jika harga di toko di sana kembali naik lebih cepat.",
+        "Bunga surat utang jangka pendek turun karena The Fed memperoleh alasan memotong bunga ketika belanja tidak lagi tergerus secepat sebelumnya. Saham yang menjual ke rumah tangga naik karena pembeli mampu membeli lebih banyak, terpisah dari saham yang naik hanya karena utang lebih murah. Bunga kebijakan belum diubah hari ini; yang turun adalah harga utang di pasar. Rapat berikutnya yang mengesahkan harapan itu.",
+        "The Fed menurunkan bunga apabila harga tetap lebih tenang selama beberapa bulan. Saham yang butuh pinjaman murah menguat selama bunga utang tidak naik kembali. Jika harga di toko kembali naik lebih cepat, pemotongan ditunda dan saham yang bergantung pada daya beli melemah. Biaya utang perusahaan mengikuti bukti harga, bukan satu bulan yang tenang.",
+        "Dolar melemah terhadap euro dan yen karena bunga turun mengikuti harga yang lebih tenang. Selera risiko (minat menaruh dana pada aset yang hasilnya tidak pasti) meningkat, sebab pinjaman global dihitung lebih murah. Volume barang yang dikirim tidak berubah pada hari rilis. Pesanan tidak disusun ulang oleh laporan harga satu bulan.",
+        "Harga barang di luar Amerika Serikat yang memakai patokan dari sana menghadapi tekanan yang lebih ringan. Pinjaman dalam dolar menjadi lebih murah mengikuti dolar yang lebih lemah. Minat pada aset yang hasilnya tidak pasti bertahan selama harga di Amerika Serikat tidak naik lagi. Dolar menguat kembali jika The Fed kehilangan alasan memotong bunga.",
     )
 
 
@@ -571,7 +577,7 @@ def _market_lines(f):
     if origin == "US" and family == "guidance":
         if up:
             return _pack(
-                "Pernyataan bank sentral terdengar lebih condong menahan bunga tinggi, sehingga pasar menunda harapan pemotongan dan rupiah melemah terhadap dolar. Harga SBN (surat utang negara) turun karena imbal hasil acuan tidak mereda. IHSG (saham Indonesia) turun ketika biaya dana dolar menekan valuasi. BI tidak mengubah suku bunga pada hari pernyataan, karena keputusan bunga ada pada rapat, bukan pada kalimat hari ini.",
+                "Pernyataan bank sentral terdengar lebih condong menahan bunga tinggi, sehingga pasar menunda harapan pemotongan dan rupiah melemah terhadap dolar. Harga SBN (surat utang negara) turun karena imbal hasil acuan tidak mereda. IHSG (saham Indonesia) turun karena laba perusahaan dihitung dengan biaya pinjaman dolar yang lebih mahal. BI tidak mengubah suku bunga pada hari pernyataan, karena keputusan bunga ada pada rapat, bukan pada kalimat hari ini.",
                 "BI tidak mengubah suku bunga sebelum rapat The Fed, sebab pernyataan saja belum menjadi keputusan. Harga SBN (surat utang negara) mengikuti dolar sampai rapat itu memberi angka bunga yang baru. IHSG (saham Indonesia) tetap tertekan selama pasar menghitung pinjaman tetap mahal. Rupiah baru stabil jika rapat berikutnya terdengar lebih lunak.",
                 "Imbal hasil surat utang jangka pendek naik karena pasar mendengar bunga akan ditahan lebih lama. Saham turun sebab biaya pinjaman yang diharapkan tidak turun. Suku bunga kebijakan The Fed belum berubah pada hari pernyataan. Yang bergerak adalah harapan, dan harapan itu menunggu rapat untuk menjadi keputusan.",
                 "Bunga The Fed baru berubah pada rapat berikutnya, bukan pada hari pernyataan ini. Saham mengikuti imbal hasil surat utang sampai rapat itu. Jika nada tetap ketat, biaya utang perusahaan bertahan tinggi selama beberapa bulan. Jika nada melunak, imbal hasil turun lebih dulu daripada keputusan bunga.",
@@ -598,7 +604,7 @@ def _market_lines(f):
             )
         return _pack(
             "Permintaan di Amerika Serikat lebih lemah, sehingga harapan bunga The Fed turun dan rupiah menguat. Harga SBN (surat utang negara) naik karena imbal hasil acuan mereda. Saham ekspor di IHSG (saham Indonesia) turun karena pesanan dari sana susut, meskipun biaya dana lebih ringan. BI tidak mengubah suku bunga pada hari yang sama.",
-            "BI memperoleh ruang menurunkan suku bunga setelah dolar mereda. Saham ekspor di IHSG (saham Indonesia) tetap lebih lemah karena pesanan dari Amerika Serikat susut. Harga SBN (surat utang negara) menguat bersama rupiah. Dua arah itu bisa berjalan bersama: biaya dana turun, tetapi pembeli luar lebih sedikit.",
+            "BI memperoleh ruang menurunkan suku bunga setelah dolar mereda. Saham ekspor di IHSG (saham Indonesia) tetap lebih lemah karena pesanan dari Amerika Serikat susut. Harga SBN (surat utang negara) menguat bersama rupiah. Dua arah itu berjalan bersama: biaya dana turun, tetapi pembeli luar lebih sedikit.",
             "Saham perusahaan yang menjual barang turun karena pesanan lebih kecil, dan imbal hasil surat utang jangka pendek ikut turun. The Fed belum mengubah suku bunga kebijakan pada hari rilis. Yang melemah adalah prospek laba penjual barang. Yang turun pada bunga adalah harga utang, karena pemotongan menjadi lebih mungkin.",
             "The Fed menurunkan suku bunga apabila permintaan tetap lebih lemah. Saham penjual barang tetap lebih lemah meskipun pinjaman lebih murah, karena masalahnya ada pada pesanan, bukan pada biaya bunga semata. Imbal hasil surat utang jangka pendek mengikuti pelonggaran itu. Saham yang butuh pinjaman murah mendapat bantuan yang tidak diterima oleh penjual barang.",
             "Dolar melemah terhadap euro dan yen seiring imbal hasil yang lebih rendah. Selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti) turun untuk saham barang. Perdagangan belum berubah pada hari pengumuman. Pembatalan pesanan baru tercatat pada data bulan berikutnya.",
@@ -607,7 +613,7 @@ def _market_lines(f):
     if origin == "US" and family == "activity":
         if up:
             return _pack(
-                "Survei kegiatan di Amerika Serikat lebih kuat, sehingga pasar menunda harapan pemotongan bunga dan rupiah melemah. Harga SBN (surat utang negara) turun karena imbal hasil acuan tidak mereda. IHSG (saham Indonesia) ikut turun ketika biaya dana dolar menekan valuasi. BI tidak mengubah suku bunga, karena ini gambaran satu bulan, bukan keputusan bunga.",
+                "Survei kegiatan di Amerika Serikat lebih kuat, sehingga pasar menunda harapan pemotongan bunga dan rupiah melemah. Harga SBN (surat utang negara) turun karena imbal hasil acuan tidak mereda. IHSG (saham Indonesia) ikut turun karena biaya pinjaman dolar memotong hitungan laba. BI tidak mengubah suku bunga, karena ini gambaran satu bulan, bukan keputusan bunga.",
                 "Suku bunga BI tetap, sebab survei satu bulan belum mengubah jalur bunga di dalam negeri. Harga SBN (surat utang negara) dan IHSG (saham Indonesia) mudah kembali jika angka bulan depan berlawanan arah. Rupiah mengikuti dolar hanya selama harapan bunga The Fed tidak dilonggarkan. Data bulan berikutnya lebih menentukan daripada satu survei.",
                 "Saham perusahaan Amerika Serikat naik karena kegiatan yang disurvei lebih sibuk, dan imbal hasil surat utang jangka pendek ikut naik. The Fed tidak mengubah suku bunga pada hari rilis. Survei bukan keputusan bunga dan bukan jumlah orang yang mendapat kerja. Harga saham dan harga utang sama-sama bereaksi karena pasar membaca kegiatan yang lebih panas.",
                 "Suku bunga The Fed tetap sampai ada data yang lebih lengkap daripada satu survei. Saham Amerika Serikat mudah kembali ke posisi semula pada angka bulan depan. Imbal hasil surat utang jangka pendek juga mudah berbalik jika survei berikutnya lebih lemah. Beberapa bulan ke depan tidak ditetapkan oleh satu bulan saja.",
@@ -701,7 +707,7 @@ def _id_lines(f, up):
             "Harga barang lebih tenang, sehingga daya beli pulih dan saham konsumen di IHSG (saham Indonesia) naik. Harga SBN (surat utang negara) naik karena pasar menghitung ruang pemotongan bunga. BI memperoleh ruang menurunkan suku bunga. Rupiah tidak tertekan oleh data harga ini, karena yang berubah adalah harga barang, bukan selisih bunga terhadap dolar pada hari yang sama."
         )
         lines["id_panjang"] = (
-            "Daya beli menipis selama harga barang tetap naik lebih cepat, dan BI menahan suku bunga. Harga SBN (surat utang negara) baru naik setelah laju harga mereda dan imbal hasil bisa turun. IHSG (saham Indonesia) yang menjual ke rumah tangga tetap lebih rendah sampai belanja pulih. Rupiah baru mendapat dukungan jika BI tidak perlu menaikkan bunga untuk menahan harga."
+            "Daya beli menipis selama harga barang tetap naik lebih cepat, dan BI menahan suku bunga. Harga SBN (surat utang negara) baru naik setelah laju harga mereda dan bunga yang diminta pembeli turun. IHSG (saham Indonesia) yang menjual ke rumah tangga tetap lebih rendah sampai belanja pulih. Rupiah baru mendapat dukungan jika BI tidak perlu menaikkan bunga untuk menahan harga."
             if up else
             "Daya beli pulih dan BI menurunkan suku bunga apabila harga barang tetap tenang. Harga SBN (surat utang negara) tetap lebih tinggi selama imbal hasil tidak naik kembali. IHSG (saham Indonesia) yang menjual ke rumah tangga bertahan lebih tinggi. Rupiah tidak perlu dibela dengan bunga yang lebih tinggi selama laju harga jinak."
         )
@@ -920,7 +926,7 @@ def _strip_fact(f, text):
 def market_views(ev):
     f = _facts(ev)
     lines = _market_lines(f)
-    return {k: _clip(_strip_fact(f, lines.get(k)), 720) for k in MARKET_KEYS}
+    return {k: _clip(_strip_fact(f, lines.get(k)), 1000) for k in MARKET_KEYS}
 
 def build_macro_read(ev):
     read = market_views(ev)
@@ -974,31 +980,33 @@ def llm_analysis(ev, level, read, next_txt):
                                        "previous", "unit", "scale", "source")}
     peta = {k: read.get(k) for k in ("ringkasan",) + MARKET_KEYS}
     prompt = (
-        "Kamu menjelaskan rilis ekonomi dalam bahasa Indonesia yang formal, padat, dan lugas.\n"
-        "Jangan pakai kencang, melaju, melonjak, atau motor pertumbuhan. "
-        "Pakai padanan formal: lebih cepat, meningkat, menurun.\n"
-        "Jangan pakai kata stance, siklus, kanal, momentum, disinflasi, durasi, atau rezim. "
-        "Kalau perlu menyebut bunga, dolar, rupiah, saham, atau harga barang, pakai kata itu saja.\n"
+        "Kamu menjelaskan rilis ekonomi untuk pembaca pemula, dalam bahasa Indonesia yang formal dan padat.\n"
+        "Formal, bukan obrolan. Jangan pakai kencang, melaju, melonjak, atau motor pertumbuhan. "
+        "Pakai padanan: lebih cepat, meningkat, menurun.\n"
+        "Jangan pakai stance, siklus, kanal, saluran, momentum, disinflasi, durasi, rezim, atau valuasi. "
+        "Istilah yang tetap dipakai harus disebut bersama artinya pada pemakaian pertama: "
+        "SBN (surat utang negara), IHSG (saham Indonesia), imbal hasil (bunga yang diterima pembeli utang), "
+        "selera risiko (minat menaruh dana pada aset yang hasilnya tidak pasti).\n"
         "Gunakan HANYA angka yang diberikan. Jangan mengarang data lain. Jangan menyuruh beli atau jual.\n"
         "Balas HANYA JSON valid, tanpa markdown, dengan kunci:\n"
-        "ringkasan: fakta sekali saja. Nama indikator, angkanya, dan artinya sehari-hari "
-        "(lebih banyak orang dapat kerja, harga naik lebih cepat, bunga lebih tinggi). "
-        "Jangan tulis akibat ke rupiah, bunga, saham, atau dolar di ringkasan.\n"
+        "ringkasan: fakta sekali. Sebut arti sehari-hari indikator ini SATU kali "
+        "(orang yang mencari kerja, harga barang di toko, bunga kebijakan). "
+        "Jangan tulis akibat ke rupiah, saham, atau dolar di ringkasan.\n"
         "id_pendek, id_panjang, us_pendek, us_panjang, global_pendek, global_panjang: "
-        "masing-masing TIGA sampai LIMA kalimat utuh. Jangan satu atau dua kalimat. "
-        "Jangan dipotong di tengah. Keenamnya harus berbeda bentuk kalimatnya.\n"
-        "Setiap horizon memuat tiga hal: arah geraknya, mengapa itu terjadi untuk jenis indikator ini, "
-        "dan salurannya. Indonesia: rupiah, SBN (surat utang negara), IHSG (saham Indonesia), dan BI. "
-        "Amerika: imbal hasil surat utang, saham, dan The Fed. "
-        "Global: dolar, selera risiko (minat menempatkan dana pada aset yang imbal hasilnya tidak pasti), "
-        "dan perdagangan barang.\n"
-        "Jangan ulang pola yang sama seperti 'IHSG naik, rupiah naik' di setiap horizon. "
-        "Data tenaga kerja, pertumbuhan, inflasi, dan suku bunga tidak boleh memakai kalimat yang sama.\n"
+        "masing-masing TIGA sampai LIMA kalimat, di bawah 1000 karakter. Jangan dipotong.\n"
+        "Padat artinya setiap kalimat menambah alasan yang belum dikatakan. "
+        "Urutannya: mengapa selisih dari perkiraan itu penting, lalu bagaimana itu sampai ke harga, bunga, atau nilai tukar. "
+        "Jangan memanjangkan dengan mengulang gerakan yang sama. "
+        "Jangan jatuh ke pola tetap seperti 'IHSG naik, rupiah naik'.\n"
+        "Indonesia menyebut rupiah, SBN, IHSG, dan BI, masing-masing dengan alasan yang berbeda. "
+        "Amerika menyebut bunga surat utang, saham, dan The Fed. "
+        "Global menyebut dolar, selera risiko, dan perdagangan barang.\n"
+        "Keenam horizon harus berbeda bentuk kalimatnya. "
+        "Tenaga kerja, pertumbuhan, harga konsumen, dan suku bunga tidak boleh memakai kalimat yang sama.\n"
         "Jangan ulang nama indikator. Jangan ulang kalimat fakta dari ringkasan. "
         "Jangan pakai biasanya, bisa, atau kalimat pengisi.\n"
-        "Jangka pendek artinya hari rilis. Jangka panjang artinya beberapa bulan ke depan.\n"
-        "Kalau suatu harga tidak bergerak, jelaskan mengapa di dalam kalimat yang utuh, "
-        "bukan sebagai pengumuman satu kata.\n\n"
+        "Jangka pendek adalah hari rilis. Jangka panjang adalah beberapa bulan ke depan.\n"
+        "Kalau suatu harga tidak bergerak, jelaskan sebabnya dalam kalimat utuh.\n\n"
         f"Data: {json.dumps(payload, ensure_ascii=False)}\n"
         f"Kategori dampak ke Indonesia: {level}\n"
         f"Rilis berikutnya: {next_txt}\n"
