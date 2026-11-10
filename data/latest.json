@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-10 01:49 UTC",
+  "updated_at": "2026-11-10 13:56 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -150,8 +150,8 @@
       "source": "Indonesia",
       "group": "Konsumsi & aktivitas",
       "indicator": "Indeks keyakinan konsumen",
-      "period": "Sep. 2026",
-      "value": "118.1",
+      "period": "Oct. 2026",
+      "value": "119.9",
       "url": "https://www.bi.go.id"
     },
     {
@@ -159,8 +159,8 @@
       "source": "Indonesia",
       "group": "Konsumsi & aktivitas",
       "indicator": "Penjualan ritel (yoy)",
-      "period": "Aug. 2026",
-      "value": "1.3%",
+      "period": "Sep. 2026",
+      "value": "0.6%",
       "url": "https://www.bi.go.id"
     },
     {
@@ -168,8 +168,8 @@
       "source": "Indonesia",
       "group": "Konsumsi & aktivitas",
       "indicator": "Penjualan mobil (yoy)",
-      "period": "Sep. 2026",
-      "value": "28.1%",
+      "period": "Oct. 2026",
+      "value": "10%",
       "url": "https://www.tradingview.com/economic-calendar/"
     },
     {
@@ -177,8 +177,8 @@
       "source": "Indonesia",
       "group": "Konsumsi & aktivitas",
       "indicator": "Penjualan motor (yoy)",
-      "period": "Sep. 2026",
-      "value": "15.37%",
+      "period": "Oct. 2026",
+      "value": "7.9%",
       "url": "https://www.tradingview.com/economic-calendar/"
     },
     {
@@ -186,7 +186,7 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Moneter",
       "indicator": "Fed Funds Rate - batas atas target (%)",
-      "period": "2026-11-09",
+      "period": "2026-11-10",
       "value": 4.0,
       "url": "https://fred.stlouisfed.org/series/DFEDTARU"
     },
