@@ -1,0 +1,15 @@
+name: BI Rate Discord send
+
+# BI Rate 21 Okt 2026 sudah terkirim sekali (HTTP 200). Tidak ada trigger push.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "BI Rate sudah terkirim"

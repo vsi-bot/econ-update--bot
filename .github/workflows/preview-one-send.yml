@@ -1,0 +1,15 @@
+name: Calendar preview once
+
+# Jadwal 9 Nov 2026 sudah terkirim sekali (HTTP 204). Tidak ada trigger push.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "jadwal hari ini sudah terkirim"
