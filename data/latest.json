@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-10 13:56 UTC",
+  "updated_at": "2026-11-11 01:49 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -204,8 +204,8 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Inflasi",
       "indicator": "Inflasi CPI AS (% yoy)",
-      "period": "2026-09-01",
-      "value": 4.02,
+      "period": "2026-10-01",
+      "value": 4.08,
       "url": "https://fred.stlouisfed.org/series/CPIAUCSL"
     },
     {
@@ -240,8 +240,8 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Pasar",
       "indicator": "US Treasury 10 tahun (%)",
-      "period": "2026-11-06",
-      "value": 4.86,
+      "period": "2026-11-09",
+      "value": 4.88,
       "url": "https://fred.stlouisfed.org/series/DGS10"
     },
     {
