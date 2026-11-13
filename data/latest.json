@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-12 14:02 UTC",
+  "updated_at": "2026-11-13 01:54 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -240,8 +240,8 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Pasar",
       "indicator": "US Treasury 10 tahun (%)",
-      "period": "2026-11-09",
-      "value": 4.88,
+      "period": "2026-11-10",
+      "value": 4.98,
       "url": "https://fred.stlouisfed.org/series/DGS10"
     },
     {
@@ -264,6 +264,13 @@
     }
   ],
   "news": [
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261112a.htm",
+      "source": "The Fed",
+      "title": "Federal Reserve announces revised tentative schedule of Federal Open Market Committee meetings in 2027",
+      "date": "Thu, 12 Nov 2026 17:45:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261112a.htm"
+    },
     {
       "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
       "source": "The Fed",
@@ -361,13 +368,6 @@
       "title": "Minutes of the Board's discount rate meeting on April 20 and 29, 2026",
       "date": "Tue, 26 May 2026 18:00:00 GMT",
       "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260526a.htm"
-    },
-    {
-      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm",
-      "source": "The Fed",
-      "title": "Minutes of the Federal Open Market Committee, April 28-29, 2026",
-      "date": "Wed, 20 May 2026 18:00:00 GMT",
-      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm"
     }
   ]
 }

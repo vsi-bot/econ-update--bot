@@ -1,6 +1,6 @@
 # Economic Outlook Monitor
 
-_Update terakhir: 2026-11-12 14:02 UTC_
+_Update terakhir: 2026-11-13 01:54 UTC_
 
 ## Indonesia
 
@@ -37,12 +37,13 @@ _Update terakhir: 2026-11-12 14:02 UTC_
 |  | [Core PCE AS (% yoy)](https://fred.stlouisfed.org/series/PCEPILFE) | 2026-09-01 | 3.12 |
 | Tenaga kerja | [Tingkat pengangguran AS (%)](https://fred.stlouisfed.org/series/UNRATE) | 2026-10-01 | 4.1 |
 | Pertumbuhan | [Pertumbuhan GDP riil AS (% qoq, annualized)](https://fred.stlouisfed.org/series/A191RL1Q225SBEA) | 2026-07-01 | 3.4 |
-| Pasar | [US Treasury 10 tahun (%)](https://fred.stlouisfed.org/series/DGS10) | 2026-11-09 | 4.88 |
+| Pasar | [US Treasury 10 tahun (%)](https://fred.stlouisfed.org/series/DGS10) | 2026-11-10 | 4.98 |
 |  | [Indeks dolar AS (broad)](https://fred.stlouisfed.org/series/DTWEXBGS) | 2026-11-06 | 121.88 |
 |  | [USD/IDR rata-rata bulanan (OECD via FRED)](https://fred.stlouisfed.org/series/CCUSMA02IDM618N) | 2026-09-01 | 17743.05 |
 
 ## Rilis terbaru The Fed
 
+- Thu, 12 Nov 2026 17:45:00 GMT · [Federal Reserve announces revised tentative schedule of Federal Open Market Committee meetings in 2027](https://www.federalreserve.gov/newsevents/pressreleases/monetary20261112a.htm)
 - Wed, 28 Oct 2026 18:00:00 GMT · [Federal Reserve issues FOMC statement](https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm)
 - Tue, 13 Oct 2026 18:00:00 GMT · [Minutes of the Board's discount rate meetings on August 17, September 9, and September 16, 2026](https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm)
 - Wed, 7 Oct 2026 18:00:00 GMT · [Minutes of the Federal Open Market Committee, September 15-16, 2026](https://www.federalreserve.gov/newsevents/pressreleases/monetary20261007a.htm)
@@ -52,6 +53,5 @@ _Update terakhir: 2026-11-12 14:02 UTC_
 - Wed, 19 Aug 2026 18:00:00 GMT · [Minutes of the Federal Open Market Committee, July 28–29, 2026](https://www.federalreserve.gov/newsevents/pressreleases/monetary20260819a.htm)
 - Wed, 29 Jul 2026 18:00:00 GMT · [Federal Reserve issues FOMC statement](https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm)
 - Tue, 14 Jul 2026 18:00:00 GMT · [Minutes of the Board's discount rate meetings on June 8 and June 17, 2026](https://www.federalreserve.gov/newsevents/pressreleases/monetary20260714a.htm)
-- Thu, 9 Jul 2026 19:00:00 GMT · [Federal Reserve announces the leadership and objectives of its task forces to advance the conduct of monetary policy](https://www.federalreserve.gov/newsevents/pressreleases/monetary20260709a.htm)
 
 _Sumber: kalender ekonomi TradingView (data BPS/BI), FRED, federalreserve.gov_
