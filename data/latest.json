@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-13 13:59 UTC",
+  "updated_at": "2026-11-16 02:13 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -186,7 +186,7 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Moneter",
       "indicator": "Fed Funds Rate - batas atas target (%)",
-      "period": "2026-11-13",
+      "period": "2026-11-15",
       "value": 4.0,
       "url": "https://fred.stlouisfed.org/series/DFEDTARU"
     },
@@ -240,8 +240,8 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Pasar",
       "indicator": "US Treasury 10 tahun (%)",
-      "period": "2026-11-10",
-      "value": 4.98,
+      "period": "2026-11-12",
+      "value": 5.1,
       "url": "https://fred.stlouisfed.org/series/DGS10"
     },
     {
