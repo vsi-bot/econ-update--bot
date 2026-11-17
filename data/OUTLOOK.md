@@ -1,6 +1,6 @@
 # Economic Outlook Monitor
 
-_Update terakhir: 2026-11-17 01:58 UTC_
+_Update terakhir: 2026-11-17 14:00 UTC_
 
 ## Indonesia
 
@@ -31,7 +31,7 @@ _Update terakhir: 2026-11-17 01:58 UTC_
 
 | Kelompok | Indikator | Periode | Nilai |
 |---|---|---|---|
-| Moneter | [Fed Funds Rate - batas atas target (%)](https://fred.stlouisfed.org/series/DFEDTARU) | 2026-11-16 | 4.0 |
+| Moneter | [Fed Funds Rate - batas atas target (%)](https://fred.stlouisfed.org/series/DFEDTARU) | 2026-11-17 | 4.0 |
 |  | [Fed Funds Rate efektif (%)](https://fred.stlouisfed.org/series/FEDFUNDS) | 2026-10-01 | 3.88 |
 | Inflasi | [Inflasi CPI AS (% yoy)](https://fred.stlouisfed.org/series/CPIAUCSL) | 2026-10-01 | 4.08 |
 |  | [Core PCE AS (% yoy)](https://fred.stlouisfed.org/series/PCEPILFE) | 2026-09-01 | 3.12 |
