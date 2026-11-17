@@ -1,6 +1,6 @@
 # Economic Outlook Monitor
 
-_Update terakhir: 2026-11-16 15:44 UTC_
+_Update terakhir: 2026-11-17 01:58 UTC_
 
 ## Indonesia
 
@@ -37,9 +37,9 @@ _Update terakhir: 2026-11-16 15:44 UTC_
 |  | [Core PCE AS (% yoy)](https://fred.stlouisfed.org/series/PCEPILFE) | 2026-09-01 | 3.12 |
 | Tenaga kerja | [Tingkat pengangguran AS (%)](https://fred.stlouisfed.org/series/UNRATE) | 2026-10-01 | 4.1 |
 | Pertumbuhan | [Pertumbuhan GDP riil AS (% qoq, annualized)](https://fred.stlouisfed.org/series/A191RL1Q225SBEA) | 2026-07-01 | 3.4 |
-| Pasar | [US Treasury 10 tahun (%)](https://fred.stlouisfed.org/series/DGS10) | 2026-11-12 | 5.1 |
-|  | [Indeks dolar AS (broad)](https://fred.stlouisfed.org/series/DTWEXBGS) | 2026-11-06 | 121.88 |
-|  | [USD/IDR rata-rata bulanan (OECD via FRED)](https://fred.stlouisfed.org/series/CCUSMA02IDM618N) | 2026-09-01 | 17743.05 |
+| Pasar | [US Treasury 10 tahun (%)](https://fred.stlouisfed.org/series/DGS10) | 2026-11-13 | 5.15 |
+|  | [Indeks dolar AS (broad)](https://fred.stlouisfed.org/series/DTWEXBGS) | 2026-11-13 | 122.65 |
+|  | [USD/IDR rata-rata bulanan (OECD via FRED)](https://fred.stlouisfed.org/series/CCUSMA02IDM618N) | 2026-10-01 | 17983.82 |
 
 ## Rilis terbaru The Fed
 
