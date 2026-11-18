@@ -1,16 +1,16 @@
 # Economic Outlook Monitor
 
-_Update terakhir: 2026-11-18 02:03 UTC_
+_Update terakhir: 2026-11-18 14:02 UTC_
 
 ## Indonesia
 
 | Kelompok | Indikator | Periode | Nilai |
 |---|---|---|---|
-| Moneter | [BI-Rate](https://www.bi.go.id) | Oct. 2026 | 5.75% |
-|  | [Suku bunga Deposit Facility](https://www.bi.go.id) | Oct. 2026 | 5% |
-|  | [Suku bunga Lending Facility](https://www.bi.go.id) | Oct. 2026 | 6.5% |
+| Moneter | [BI-Rate](https://www.bi.go.id) | Nov. 2026 | 6% |
+|  | [Suku bunga Deposit Facility](https://www.bi.go.id) | Nov. 2026 | 5.25% |
+|  | [Suku bunga Lending Facility](https://www.bi.go.id) | Nov. 2026 | 6.75% |
 |  | [Uang beredar M2 (yoy)](https://www.tradingview.com/economic-calendar/) | Sep. 2026 | 8.3% |
-|  | [Pertumbuhan kredit (yoy)](https://www.bi.go.id) | Sep. 2026 | 13.26% |
+|  | [Pertumbuhan kredit (yoy)](https://www.bi.go.id) | Oct. 2026 | 13.21% |
 | Inflasi | [Inflasi (yoy)](https://www.bps.go.id/) | Oct. 2026 | 3.23% |
 |  | [Inflasi (mtm)](https://www.bps.go.id/) | Oct. 2026 | 0.22% |
 |  | [Inflasi inti (yoy)](https://www.bps.go.id/) | Oct. 2026 | 2.56% |
@@ -31,7 +31,7 @@ _Update terakhir: 2026-11-18 02:03 UTC_
 
 | Kelompok | Indikator | Periode | Nilai |
 |---|---|---|---|
-| Moneter | [Fed Funds Rate - batas atas target (%)](https://fred.stlouisfed.org/series/DFEDTARU) | 2026-11-17 | 4.0 |
+| Moneter | [Fed Funds Rate - batas atas target (%)](https://fred.stlouisfed.org/series/DFEDTARU) | 2026-11-18 | 4.0 |
 |  | [Fed Funds Rate efektif (%)](https://fred.stlouisfed.org/series/FEDFUNDS) | 2026-10-01 | 3.88 |
 | Inflasi | [Inflasi CPI AS (% yoy)](https://fred.stlouisfed.org/series/CPIAUCSL) | 2026-10-01 | 4.08 |
 |  | [Core PCE AS (% yoy)](https://fred.stlouisfed.org/series/PCEPILFE) | 2026-09-01 | 3.12 |
