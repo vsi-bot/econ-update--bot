@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-19 02:02 UTC",
+  "updated_at": "2026-11-19 14:06 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -186,7 +186,7 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Moneter",
       "indicator": "Fed Funds Rate - batas atas target (%)",
-      "period": "2026-11-18",
+      "period": "2026-11-19",
       "value": 4.0,
       "url": "https://fred.stlouisfed.org/series/DFEDTARU"
     },
