@@ -13,7 +13,7 @@
     "FRED:PCEPILFE": "2026-09-01|3.12",
     "FRED:UNRATE": "2026-10-01|4.1",
     "FRED:A191RL1Q225SBEA": "2026-07-01|3.4",
-    "FRED:DGS10": "2026-11-16|5.12",
+    "FRED:DGS10": "2026-11-17|5.1",
     "FRED:DTWEXBGS": "2026-11-13|122.65",
     "FRED:CCUSMA02IDM618N": "2026-10-01|17983.82",
     "TV:ECONOMICS:IDDIR": "Nov. 2026|5.25%",
@@ -33,21 +33,22 @@
     "TV:ID|Indonesia-Sales & Orders-Motorbike Sales YY*": "Oct. 2026|7.9%"
   },
   "seen_news": [
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916b.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261112a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm",
     "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261007a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260708a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261112a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260526a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260819a.htm",
     "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
     "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260825a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260714a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260708a.htm",
     "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260709a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260526a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260819a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260714a.htm",
     "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm",
-    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm"
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261007a.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916b.htm",
+    "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261118a.htm"
   ]
 }
