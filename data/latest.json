@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-19 14:06 UTC",
+  "updated_at": "2026-11-20 01:56 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -240,8 +240,8 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Pasar",
       "indicator": "US Treasury 10 tahun (%)",
-      "period": "2026-11-17",
-      "value": 5.1,
+      "period": "2026-11-18",
+      "value": 5.07,
       "url": "https://fred.stlouisfed.org/series/DGS10"
     },
     {
