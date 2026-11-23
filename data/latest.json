@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-23 02:04 UTC",
+  "updated_at": "2026-11-23 14:12 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -33,8 +33,8 @@
       "source": "Indonesia",
       "group": "Moneter",
       "indicator": "Uang beredar M2 (yoy)",
-      "period": "Sep. 2026",
-      "value": "8.3%",
+      "period": "Oct. 2026",
+      "value": "9.3%",
       "url": "https://www.tradingview.com/economic-calendar/"
     },
     {
@@ -186,7 +186,7 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Moneter",
       "indicator": "Fed Funds Rate - batas atas target (%)",
-      "period": "2026-11-22",
+      "period": "2026-11-23",
       "value": 4.0,
       "url": "https://fred.stlouisfed.org/series/DFEDTARU"
     },
