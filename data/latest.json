@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-23 14:12 UTC",
+  "updated_at": "2026-11-24 02:02 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -240,8 +240,8 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Pasar",
       "indicator": "US Treasury 10 tahun (%)",
-      "period": "2026-11-19",
-      "value": 5.04,
+      "period": "2026-11-20",
+      "value": 4.92,
       "url": "https://fred.stlouisfed.org/series/DGS10"
     },
     {
@@ -249,8 +249,8 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Pasar",
       "indicator": "Indeks dolar AS (broad)",
-      "period": "2026-11-13",
-      "value": 122.65,
+      "period": "2026-11-20",
+      "value": 123.6,
       "url": "https://fred.stlouisfed.org/series/DTWEXBGS"
     },
     {
