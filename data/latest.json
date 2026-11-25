@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-25 02:08 UTC",
+  "updated_at": "2026-11-25 14:06 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -186,7 +186,7 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Moneter",
       "indicator": "Fed Funds Rate - batas atas target (%)",
-      "period": "2026-11-24",
+      "period": "2026-11-25",
       "value": 4.0,
       "url": "https://fred.stlouisfed.org/series/DFEDTARU"
     },
@@ -213,8 +213,8 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Inflasi",
       "indicator": "Core PCE AS (% yoy)",
-      "period": "2026-09-01",
-      "value": 3.12,
+      "period": "2026-10-01",
+      "value": 3.26,
       "url": "https://fred.stlouisfed.org/series/PCEPILFE"
     },
     {
@@ -232,7 +232,7 @@
       "group": "Pertumbuhan",
       "indicator": "Pertumbuhan GDP riil AS (% qoq, annualized)",
       "period": "2026-07-01",
-      "value": 3.4,
+      "value": 4.3,
       "url": "https://fred.stlouisfed.org/series/A191RL1Q225SBEA"
     },
     {
