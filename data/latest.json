@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-24 14:07 UTC",
+  "updated_at": "2026-11-25 02:08 UTC",
   "indicators": [
     {
       "key": "TV:ECONOMICS:IDINTR",
@@ -240,7 +240,7 @@
       "source": "Amerika Serikat (FRED)",
       "group": "Pasar",
       "indicator": "US Treasury 10 tahun (%)",
-      "period": "2026-11-20",
+      "period": "2026-11-23",
       "value": 4.92,
       "url": "https://fred.stlouisfed.org/series/DGS10"
     },
@@ -264,6 +264,13 @@
     }
   ],
   "news": [
+    {
+      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261124a.htm",
+      "source": "The Fed",
+      "title": "Minutes of the Board's discount rate meetings on October 19 and October 28, 2026",
+      "date": "Tue, 24 Nov 2026 19:00:00 GMT",
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261124a.htm"
+    },
     {
       "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20261118a.htm",
       "source": "The Fed",
@@ -361,13 +368,6 @@
       "title": "Federal Reserve issues FOMC statement",
       "date": "Wed, 17 Jun 2026 18:00:00 GMT",
       "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm"
-    },
-    {
-      "id": "FED:https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm",
-      "source": "The Fed",
-      "title": "Federal Reserve Board and Federal Open Market Committee release economic projections from the June 16-17 FOMC meeting",
-      "date": "Wed, 17 Jun 2026 18:00:00 GMT",
-      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm"
     }
   ]
 }
