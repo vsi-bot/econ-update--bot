@@ -1,6 +1,6 @@
 # Economic Outlook Monitor
 
-_Update terakhir: 2026-11-26 14:05 UTC_
+_Update terakhir: 2026-11-27 02:10 UTC_
 
 ## Indonesia
 
